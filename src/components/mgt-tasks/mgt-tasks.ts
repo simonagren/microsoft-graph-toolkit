@@ -7,25 +7,24 @@
 
 import { Person, PlannerAssignments, PlannerTask, User } from '@microsoft/microsoft-graph-types';
 import { Contact, OutlookTask, OutlookTaskFolder } from '@microsoft/microsoft-graph-types-beta';
-import { customElement, html, property } from 'lit-element';
+import { customElement, html, property, TemplateResult } from 'lit-element';
 import { classMap } from 'lit-html/directives/class-map';
 import { repeat } from 'lit-html/directives/repeat';
+import { getMe } from '../../graph/graph.user';
 import { Providers } from '../../Providers';
 import { ProviderState } from '../../providers/IProvider';
 import { getShortDateString } from '../../utils/Utils';
-import { MgtPeoplePicker } from '../mgt-people-picker/mgt-people-picker';
-import { MgtTemplatedComponent } from '../templatedComponent';
-import { PersonCardInteraction } from './../PersonCardInteraction';
-import { styles } from './mgt-tasks-css';
-import { ITask, ITaskFolder, ITaskGroup, ITaskSource, PlannerTaskSource, TodoTaskSource } from './task-sources';
-
-import { getMe } from '../../graph/graph.user';
 import { ComponentMediaQuery } from '../baseComponent';
+import { MgtPeoplePicker } from '../mgt-people-picker/mgt-people-picker';
 import { MgtPeople } from '../mgt-people/mgt-people';
 import '../mgt-person/mgt-person';
 import '../sub-components/mgt-arrow-options/mgt-arrow-options';
 import '../sub-components/mgt-dot-options/mgt-dot-options';
 import '../sub-components/mgt-flyout/mgt-flyout';
+import { MgtTemplatedComponent } from '../templatedComponent';
+import { PersonCardInteraction } from './../PersonCardInteraction';
+import { styles } from './mgt-tasks-css';
+import { ITask, ITaskFolder, ITaskGroup, ITaskSource, PlannerTaskSource, TodoTaskSource } from './task-sources';
 
 /**
  * Defines how a person card is shown when a user interacts with
@@ -421,6 +420,564 @@ export class MgtTasks extends MgtTemplatedComponent {
   }
 
   /**
+   * foo
+   *
+   * @protected
+   * @returns
+   * @memberof MgtTasks
+   */
+  protected renderPlanOptions() {
+    const p = Providers.globalProvider;
+
+    if (!p || p.state !== ProviderState.SignedIn) {
+      return null;
+    }
+
+    if (this._inTaskLoad && !this._hasDoneInitialLoad) {
+      return html`
+        <span class="LoadingHeader"></span>
+      `;
+    }
+
+    const addButton =
+      this.readOnly || this._isNewTaskVisible
+        ? null
+        : html`
+            <button
+              class="AddBarItem NewTaskButton"
+              @click="${() => {
+                this.isNewTaskVisible = !this.isNewTaskVisible;
+              }}"
+            >
+              <span class="TaskIcon">\uE710</span>
+              <span>Add</span>
+            </button>
+          `;
+
+    if (this.dataSource === TasksSource.planner) {
+      const currentGroup = this._groups.find(d => d.id === this._currentGroup) || {
+        title: this.res.BASE_SELF_ASSIGNED
+      };
+      const groupOptions = {
+        [this.res.BASE_SELF_ASSIGNED]: e => {
+          this._currentGroup = null;
+          this._currentFolder = null;
+        }
+      };
+      for (const group of this._groups) {
+        groupOptions[group.title] = e => {
+          this._currentGroup = group.id;
+          this._currentFolder = null;
+        };
+      }
+      const groupSelect = html`
+        <mgt-arrow-options .options="${groupOptions}" .value="${currentGroup.title}"></mgt-arrow-options>
+      `;
+
+      const divider = !this._currentGroup
+        ? null
+        : html`
+            <span class="TaskIcon Divider">/</span>
+          `;
+
+      const currentFolder = this._folders.find(d => d.id === this._currentFolder) || {
+        name: this.res.BUCKETS_SELF_ASSIGNED
+      };
+      const folderOptions = {
+        [this.res.BUCKETS_SELF_ASSIGNED]: e => {
+          this._currentFolder = null;
+        }
+      };
+
+      for (const folder of this._folders.filter(d => d.parentId === this._currentGroup)) {
+        folderOptions[folder.name] = e => {
+          this._currentFolder = folder.id;
+        };
+      }
+
+      const folderSelect = this.targetBucketId
+        ? html`
+            <span class="PlanTitle">
+              ${this._folders[0] && this._folders[0].name}
+            </span>
+          `
+        : html`
+            <mgt-arrow-options .options="${folderOptions}" .value="${currentFolder.name}"></mgt-arrow-options>
+          `;
+
+      return html`
+        <div class="TitleCont">
+          ${groupSelect} ${divider} ${!this._currentGroup ? null : folderSelect}
+        </div>
+        ${addButton}
+      `;
+    } else {
+      const folder = this._folders.find(d => d.id === this.targetId) || { name: this.res.BUCKETS_SELF_ASSIGNED };
+      const currentFolder = this._folders.find(d => d.id === this._currentFolder) || {
+        name: this.res.BUCKETS_SELF_ASSIGNED
+      };
+
+      const folderOptions = {};
+
+      for (const d of this._folders) {
+        folderOptions[d.name] = () => {
+          this._currentFolder = d.id;
+        };
+      }
+
+      folderOptions[this.res.BUCKETS_SELF_ASSIGNED] = e => {
+        this._currentFolder = null;
+      };
+
+      const folderSelect = this.targetId
+        ? html`
+            <span class="PlanTitle">
+              ${folder.name}
+            </span>
+          `
+        : html`
+            <mgt-arrow-options .value="${currentFolder.name}" .options="${folderOptions}"></mgt-arrow-options>
+          `;
+
+      return html`
+        <span class="TitleCont">
+          ${folderSelect}
+        </span>
+        ${addButton}
+      `;
+    }
+  }
+
+  /**
+   * Render the new task form.
+   *
+   * @protected
+   * @returns
+   * @memberof MgtTasks
+   */
+  protected renderNewTask() {
+    const taskTitle = html`
+      <input
+        type="text"
+        placeholder="Task..."
+        .value="${this._newTaskName}"
+        label="new-taskName-input"
+        aria-label="new-taskName-input"
+        role="input"
+        @input="${(e: Event) => {
+          this._newTaskName = (e.target as HTMLInputElement).value;
+        }}"
+      />
+    `;
+    const groups = this._groups;
+    if (groups.length > 0 && !this._newTaskGroupId) {
+      this._newTaskGroupId = groups[0].id;
+    }
+    const group =
+      this.dataSource === TasksSource.todo
+        ? null
+        : this._currentGroup
+        ? html`
+            <span class="NewTaskGroup">
+              ${this.renderPlannerIcon()}
+              <span>${this.getPlanTitle(this._currentGroup)}</span>
+            </span>
+          `
+        : html`
+            <span class="NewTaskGroup">
+              ${this.renderPlannerIcon()}
+              <select
+                .value="${this._newTaskGroupId}"
+                @change="${(e: Event) => {
+                  this._newTaskGroupId = (e.target as HTMLInputElement).value;
+                }}"
+              >
+                ${this._groups.map(
+                  plan => html`
+                    <option value="${plan.id}">${plan.title}</option>
+                  `
+                )}
+              </select>
+            </span>
+          `;
+
+    const folders = this._folders.filter(
+      folder =>
+        (this._currentGroup && folder.parentId === this._currentGroup) ||
+        (!this._currentGroup && folder.parentId === this._newTaskGroupId)
+    );
+    if (folders.length > 0 && !this._newTaskFolderId) {
+      this._newTaskFolderId = folders[0].id;
+    }
+    const taskFolder = this._currentFolder
+      ? html`
+          <span class="NewTaskBucket">
+            ${this.renderBucketIcon()}
+            <span>${this.getFolderName(this._currentFolder)}</span>
+          </span>
+        `
+      : html`
+          <span class="NewTaskBucket">
+            ${this.renderBucketIcon()}
+            <select
+              .value="${this._newTaskFolderId}"
+              @change="${(e: Event) => {
+                this._newTaskFolderId = (e.target as HTMLInputElement).value;
+              }}"
+            >
+              ${folders.map(
+                folder => html`
+                  <option value="${folder.id}">${folder.name}</option>
+                `
+              )}
+            </select>
+          </span>
+        `;
+
+    const taskDue = html`
+      <span class="NewTaskDue">
+        <input
+          type="date"
+          label="new-taskDate-input"
+          aria-label="new-taskDate-input"
+          role="input"
+          .value="${this.dateToInputValue(this._newTaskDueDate)}"
+          @change="${(e: Event) => {
+            const value = (e.target as HTMLInputElement).value;
+            if (value) {
+              this._newTaskDueDate = new Date(value + 'T17:00');
+            } else {
+              this._newTaskDueDate = null;
+            }
+          }}"
+        />
+      </span>
+    `;
+
+    const taskPeople = this.dataSource === TasksSource.todo ? null : this.renderAssignedPeople(null);
+
+    const taskAdd = this._newTaskBeingAdded
+      ? html`
+          <div class="TaskAddButtonContainer"></div>
+        `
+      : html`
+          <div class="TaskAddButtonContainer ${this._newTaskName === '' ? 'Disabled' : ''}">
+            <div class="TaskIcon TaskCancel" @click="${() => (this.isNewTaskVisible = false)}">
+              <span>Cancel</span>
+            </div>
+            <div class="TaskIcon TaskAdd" @click="${this.onAddTaskClick}">
+              <span>\uE710</span>
+            </div>
+          </div>
+        `;
+
+    return html`
+      <div class="Task NewTask Incomplete">
+        <div class="TaskContent">
+          <div class="TaskDetailsContainer">
+            <div class="TaskTitle">
+              ${taskTitle}
+            </div>
+            <div class="TaskDetails">
+              ${group} ${taskFolder} ${taskDue} ${taskPeople}
+            </div>
+          </div>
+        </div>
+        ${taskAdd}
+      </div>
+    `;
+  }
+
+  /**
+   * Render a task.
+   *
+   * @protected
+   * @param {ITask} task
+   * @returns {TemplateResult}
+   * @memberof MgtTasks
+   */
+  protected renderTask(task: ITask): TemplateResult {
+    const { name = 'Task', completed = false, dueDate } = task;
+
+    const isLoading = this._loadingTasks.includes(task.id);
+
+    const taskCheckClasses = {
+      Complete: !isLoading && completed,
+      Loading: isLoading,
+      TaskCheck: true,
+      TaskIcon: true
+    };
+
+    const taskCheckContent = isLoading
+      ? html`
+          \uF16A
+        `
+      : completed
+      ? html`
+          \uE73E
+        `
+      : null;
+
+    const taskCheck = html`
+      <span class=${classMap(taskCheckClasses)}><span class="TaskCheckContent">${taskCheckContent}</span></span>
+    `;
+
+    const groupTitle = this._currentGroup ? null : this.getPlanTitle(task.topParentId);
+    const folderTitle = this._currentFolder ? null : this.getFolderName(task.immediateParentId);
+
+    const context = { task: { ...task._raw, groupTitle, folderTitle } };
+    const taskTemplate = this.renderTemplate('task', context, task.id);
+    if (taskTemplate) {
+      return taskTemplate;
+    }
+
+    let taskDetails = this.renderTemplate('task-details', context, `task-details-${task.id}`);
+
+    if (!taskDetails) {
+      const group =
+        this.dataSource === TasksSource.todo || this._currentGroup
+          ? null
+          : html`
+              <div class="TaskDetail TaskGroup">
+                ${this.renderPlannerIcon()}
+                <span>${this.getPlanTitle(task.topParentId)}</span>
+              </div>
+            `;
+
+      const folder = this._currentFolder
+        ? null
+        : html`
+            <div class="TaskDetail TaskBucket">
+              ${this.renderBucketIcon()}
+              <span>${this.getFolderName(task.immediateParentId)}</span>
+            </div>
+          `;
+
+      const taskDue = !dueDate
+        ? null
+        : html`
+            <div class="TaskDetail TaskDue">
+              <span>Due ${getShortDateString(dueDate)}</span>
+            </div>
+          `;
+
+      const taskPeople = this.dataSource !== TasksSource.todo ? this.renderAssignedPeople(task) : null;
+
+      taskDetails = html`
+        <div class="TaskTitle">
+          ${name}
+        </div>
+        ${group} ${folder} ${taskPeople} ${taskDue}
+      `;
+    }
+
+    const taskOptions =
+      this.readOnly || this.hideOptions
+        ? null
+        : html`
+            <div class="TaskOptions">
+              <mgt-dot-options
+                .options="${{
+                  'Delete Task': () => this.removeTask(task)
+                }}"
+              ></mgt-dot-options>
+            </div>
+          `;
+
+    return html`
+      <div
+        class=${classMap({
+          Complete: completed,
+          Incomplete: !completed,
+          ReadOnly: this.readOnly,
+          Task: true
+        })}
+      >
+        <div
+          class="TaskContent"
+          @click=${() => {
+            this.handleTaskClick(task);
+          }}
+        >
+          <span
+            class=${classMap({
+              Complete: completed,
+              Incomplete: !completed,
+              TaskCheckContainer: true
+            })}
+            @click="${e => {
+              if (!this.readOnly) {
+                if (!task.completed) {
+                  this.completeTask(task);
+                } else {
+                  this.uncompleteTask(task);
+                }
+
+                e.stopPropagation();
+                e.preventDefault();
+              }
+            }}"
+          >
+            ${taskCheck}
+          </span>
+          <div class="TaskDetailsContainer ${this.mediaQuery} ${this._currentGroup ? 'NoPlan' : ''}">
+            ${taskDetails}
+          </div>
+          ${taskOptions}
+
+          <div class="Divider"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * foo
+   *
+   * @protected
+   * @param {ITask} task
+   * @returns {TemplateResult}
+   * @memberof MgtTasks
+   */
+  protected renderAssignedPeople(task: ITask): TemplateResult {
+    let assignedPeopleHTML = null;
+
+    const taskAssigneeClasses = {
+      NewTaskAssignee: task === null,
+      TaskAssignee: task !== null,
+      TaskDetail: task !== null
+    };
+
+    const assignedPeople = task
+      ? Object.keys(task.assignments).map(key => {
+          return key;
+        })
+      : [];
+
+    const noPeopleTemplate = html`
+      <template data-type="no-data">
+        <i class="login-icon ms-Icon ms-Icon--Contact"></i>
+      </template>
+    `;
+
+    const taskId = task ? task.id : 'newTask';
+
+    assignedPeopleHTML = html`
+      <mgt-people
+        class="people-${taskId}"
+        .userIds="${assignedPeople}"
+        .personCardInteraction=${this.isPeoplePickerVisible ? PersonCardInteraction.none : PersonCardInteraction.hover}
+        >${noPeopleTemplate}
+      </mgt-people>
+    `;
+
+    return html`
+      <mgt-flyout
+        class=${classMap(taskAssigneeClasses)}
+        @click=${(e: MouseEvent) => {
+          this.showPeoplePicker(task);
+          e.stopPropagation();
+        }}
+        .isOpen=${this.isPeoplePickerVisible && task === this._currentTask}
+      >
+        ${assignedPeopleHTML}
+        <div slot="flyout" class=${classMap({ Picker: true })}>
+          <mgt-people-picker
+            class="picker-${taskId}"
+            @click=${(e: MouseEvent) => e.stopPropagation()}
+          ></mgt-people-picker>
+        </div>
+      </mgt-flyout>
+    `;
+  }
+
+  /**
+   * Render a task in a loading state.
+   *
+   * @protected
+   * @returns {TemplateResult}
+   * @memberof MgtTasks
+   */
+  protected renderLoadingTask(): TemplateResult {
+    return html`
+      <div class="Task LoadingTask">
+        <div class="TaskContent">
+          <div class="TaskCheckContainer">
+            <div class="TaskCheck"></div>
+          </div>
+          <div class="TaskDetailsContainer">
+            <div class="TaskTitle"></div>
+            <div class="TaskDetails">
+              <span class="TaskDetail">
+                <div class="TaskDetailIcon"></div>
+                <div class="TaskDetailName"></div>
+              </span>
+              <span class="TaskDetail">
+                <div class="TaskDetailIcon"></div>
+                <div class="TaskDetailName"></div>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Render the planner icon
+   *
+   * @protected
+   * @returns {TemplateResult}
+   * @memberof MgtTasks
+   */
+  protected renderPlannerIcon(): TemplateResult {
+    return html`
+      <svg width="16" height="18" viewBox="0 0 16 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          fill-rule="evenodd"
+          clip-rule="evenodd"
+          d="M7.223 1.156C6.98 1.26 6.769 1.404 6.586 1.586C6.403 1.768 6.261 1.98 6.157 2.223C6.052 2.465 6 2.724 6 3H2V17H14V3H10C10 2.724 9.948 2.465 9.844 2.223C9.74 1.98 9.596 1.768 9.414 1.586C9.231 1.404 9.02 1.26 8.777 1.156C8.535 1.053 8.276 1 8 1C7.723 1 7.465 1.053 7.223 1.156ZM5 4H7V3C7 2.86 7.026 2.729 7.078 2.609C7.13 2.49 7.202 2.385 7.293 2.293C7.384 2.202 7.49 2.131 7.609 2.079C7.73 2.026 7.859 2 8 2C8.14 2 8.271 2.026 8.39 2.079C8.511 2.131 8.616 2.202 8.707 2.293C8.798 2.385 8.87 2.49 8.922 2.609C8.974 2.729 9 2.86 9 3V4H11V5H5V4ZM12 6V4H13V16H3V4H4V6H12Z"
+          fill="#3C3C3C"
+        />
+        <path
+          fill-rule="evenodd"
+          clip-rule="evenodd"
+          d="M7.35156 12.3517L5.49956 14.2037L4.14856 12.8517L4.85156 12.1487L5.49956 12.7967L6.64856 11.6487L7.35156 12.3517Z"
+          fill="#3C3C3C"
+        />
+        <path
+          fill-rule="evenodd"
+          clip-rule="evenodd"
+          d="M7.35156 8.35168L5.49956 10.2037L4.14856 8.85168L4.85156 8.14868L5.49956 8.79668L6.64856 7.64868L7.35156 8.35168Z"
+          fill="#3C3C3C"
+        />
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M8 14H12.001V13H8V14Z" fill="#3C3C3C" />
+        <path fill-rule="evenodd" clip-rule="evenodd" d="M8 10H12.001V9H8V10Z" fill="#3C3C3C" />
+      </svg>
+    `;
+  }
+
+  /**
+   * Render the bucket icon
+   *
+   * @protected
+   * @returns {TemplateResult}
+   * @memberof MgtTasks
+   */
+  protected renderBucketIcon(): TemplateResult {
+    return html`
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          fill-rule="evenodd"
+          clip-rule="evenodd"
+          d="M14 2H2V4H3H5H6H10H11H13H14V2ZM10 5H6V6H10V5ZM5 5H3V14H13V5H11V6C11 6.55228 10.5523 7 10 7H6C5.44772 7 5 6.55228 5 6V5ZM1 5H2V14V15H3H13H14V14V5H15V4V2V1H14H2H1V2V4V5Z"
+          fill="#3C3C3C"
+        />
+      </svg>
+    `;
+  }
+
+  /**
    * loads tasks from dataSource
    *
    * @returns
@@ -697,260 +1254,6 @@ export class MgtTasks extends MgtTemplatedComponent {
     }
   }
 
-  private renderPlanOptions() {
-    const p = Providers.globalProvider;
-
-    if (!p || p.state !== ProviderState.SignedIn) {
-      return null;
-    }
-
-    if (this._inTaskLoad && !this._hasDoneInitialLoad) {
-      return html`
-        <span class="LoadingHeader"></span>
-      `;
-    }
-
-    const addButton =
-      this.readOnly || this._isNewTaskVisible
-        ? null
-        : html`
-            <button
-              class="AddBarItem NewTaskButton"
-              @click="${() => {
-                this.isNewTaskVisible = !this.isNewTaskVisible;
-              }}"
-            >
-              <span class="TaskIcon">\uE710</span>
-              <span>Add</span>
-            </button>
-          `;
-
-    if (this.dataSource === TasksSource.planner) {
-      const currentGroup = this._groups.find(d => d.id === this._currentGroup) || {
-        title: this.res.BASE_SELF_ASSIGNED
-      };
-      const groupOptions = {
-        [this.res.BASE_SELF_ASSIGNED]: e => {
-          this._currentGroup = null;
-          this._currentFolder = null;
-        }
-      };
-      for (const group of this._groups) {
-        groupOptions[group.title] = e => {
-          this._currentGroup = group.id;
-          this._currentFolder = null;
-        };
-      }
-      const groupSelect = html`
-        <mgt-arrow-options .options="${groupOptions}" .value="${currentGroup.title}"></mgt-arrow-options>
-      `;
-
-      const divider = !this._currentGroup
-        ? null
-        : html`
-            <span class="TaskIcon Divider">/</span>
-          `;
-
-      const currentFolder = this._folders.find(d => d.id === this._currentFolder) || {
-        name: this.res.BUCKETS_SELF_ASSIGNED
-      };
-      const folderOptions = {
-        [this.res.BUCKETS_SELF_ASSIGNED]: e => {
-          this._currentFolder = null;
-        }
-      };
-
-      for (const folder of this._folders.filter(d => d.parentId === this._currentGroup)) {
-        folderOptions[folder.name] = e => {
-          this._currentFolder = folder.id;
-        };
-      }
-
-      const folderSelect = this.targetBucketId
-        ? html`
-            <span class="PlanTitle">
-              ${this._folders[0] && this._folders[0].name}
-            </span>
-          `
-        : html`
-            <mgt-arrow-options .options="${folderOptions}" .value="${currentFolder.name}"></mgt-arrow-options>
-          `;
-
-      return html`
-        <div class="TitleCont">
-          ${groupSelect} ${divider} ${!this._currentGroup ? null : folderSelect}
-        </div>
-        ${addButton}
-      `;
-    } else {
-      const folder = this._folders.find(d => d.id === this.targetId) || { name: this.res.BUCKETS_SELF_ASSIGNED };
-      const currentFolder = this._folders.find(d => d.id === this._currentFolder) || {
-        name: this.res.BUCKETS_SELF_ASSIGNED
-      };
-
-      const folderOptions = {};
-
-      for (const d of this._folders) {
-        folderOptions[d.name] = () => {
-          this._currentFolder = d.id;
-        };
-      }
-
-      folderOptions[this.res.BUCKETS_SELF_ASSIGNED] = e => {
-        this._currentFolder = null;
-      };
-
-      const folderSelect = this.targetId
-        ? html`
-            <span class="PlanTitle">
-              ${folder.name}
-            </span>
-          `
-        : html`
-            <mgt-arrow-options .value="${currentFolder.name}" .options="${folderOptions}"></mgt-arrow-options>
-          `;
-
-      return html`
-        <span class="TitleCont">
-          ${folderSelect}
-        </span>
-        ${addButton}
-      `;
-    }
-  }
-  private renderNewTask() {
-    const taskTitle = html`
-      <input
-        type="text"
-        placeholder="Task..."
-        .value="${this._newTaskName}"
-        label="new-taskName-input"
-        aria-label="new-taskName-input"
-        role="input"
-        @input="${(e: Event) => {
-          this._newTaskName = (e.target as HTMLInputElement).value;
-        }}"
-      />
-    `;
-    const groups = this._groups;
-    if (groups.length > 0 && !this._newTaskGroupId) {
-      this._newTaskGroupId = groups[0].id;
-    }
-    const group =
-      this.dataSource === TasksSource.todo
-        ? null
-        : this._currentGroup
-        ? html`
-            <span class="NewTaskGroup">
-              ${this.renderPlannerIcon()}
-              <span>${this.getPlanTitle(this._currentGroup)}</span>
-            </span>
-          `
-        : html`
-            <span class="NewTaskGroup">
-              ${this.renderPlannerIcon()}
-              <select
-                .value="${this._newTaskGroupId}"
-                @change="${(e: Event) => {
-                  this._newTaskGroupId = (e.target as HTMLInputElement).value;
-                }}"
-              >
-                ${this._groups.map(
-                  plan => html`
-                    <option value="${plan.id}">${plan.title}</option>
-                  `
-                )}
-              </select>
-            </span>
-          `;
-
-    const folders = this._folders.filter(
-      folder =>
-        (this._currentGroup && folder.parentId === this._currentGroup) ||
-        (!this._currentGroup && folder.parentId === this._newTaskGroupId)
-    );
-    if (folders.length > 0 && !this._newTaskFolderId) {
-      this._newTaskFolderId = folders[0].id;
-    }
-    const taskFolder = this._currentFolder
-      ? html`
-          <span class="NewTaskBucket">
-            ${this.renderBucketIcon()}
-            <span>${this.getFolderName(this._currentFolder)}</span>
-          </span>
-        `
-      : html`
-          <span class="NewTaskBucket">
-            ${this.renderBucketIcon()}
-            <select
-              .value="${this._newTaskFolderId}"
-              @change="${(e: Event) => {
-                this._newTaskFolderId = (e.target as HTMLInputElement).value;
-              }}"
-            >
-              ${folders.map(
-                folder => html`
-                  <option value="${folder.id}">${folder.name}</option>
-                `
-              )}
-            </select>
-          </span>
-        `;
-
-    const taskDue = html`
-      <span class="NewTaskDue">
-        <input
-          type="date"
-          label="new-taskDate-input"
-          aria-label="new-taskDate-input"
-          role="input"
-          .value="${this.dateToInputValue(this._newTaskDueDate)}"
-          @change="${(e: Event) => {
-            const value = (e.target as HTMLInputElement).value;
-            if (value) {
-              this._newTaskDueDate = new Date(value + 'T17:00');
-            } else {
-              this._newTaskDueDate = null;
-            }
-          }}"
-        />
-      </span>
-    `;
-
-    const taskPeople = this.dataSource === TasksSource.todo ? null : this.renderAssignedPeople(null);
-
-    const taskAdd = this._newTaskBeingAdded
-      ? html`
-          <div class="TaskAddButtonContainer"></div>
-        `
-      : html`
-          <div class="TaskAddButtonContainer ${this._newTaskName === '' ? 'Disabled' : ''}">
-            <div class="TaskIcon TaskCancel" @click="${() => (this.isNewTaskVisible = false)}">
-              <span>Cancel</span>
-            </div>
-            <div class="TaskIcon TaskAdd" @click="${this.onAddTaskClick}">
-              <span>\uE710</span>
-            </div>
-          </div>
-        `;
-
-    return html`
-      <div class="Task NewTask Incomplete">
-        <div class="TaskContent">
-          <div class="TaskDetailsContainer">
-            <div class="TaskTitle">
-              ${taskTitle}
-            </div>
-            <div class="TaskDetails">
-              ${group} ${taskFolder} ${taskDue} ${taskPeople}
-            </div>
-          </div>
-        </div>
-        ${taskAdd}
-      </div>
-    `;
-  }
-
   private showPeoplePicker(task: ITask) {
     if (this.isPeoplePickerVisible) {
       const isCurrentTask = task === this._currentTask;
@@ -1000,262 +1303,10 @@ export class MgtTasks extends MgtTemplatedComponent {
     return mgtPeople;
   }
 
-  private renderTask(task: ITask) {
-    const { name = 'Task', completed = false, dueDate } = task;
-
-    const isLoading = this._loadingTasks.includes(task.id);
-
-    const taskCheckClasses = {
-      Complete: !isLoading && completed,
-      Loading: isLoading,
-      TaskCheck: true,
-      TaskIcon: true
-    };
-
-    const taskCheckContent = isLoading
-      ? html`
-          \uF16A
-        `
-      : completed
-      ? html`
-          \uE73E
-        `
-      : null;
-
-    const taskCheck = html`
-      <span class=${classMap(taskCheckClasses)}><span class="TaskCheckContent">${taskCheckContent}</span></span>
-    `;
-
-    const groupTitle = this._currentGroup ? null : this.getPlanTitle(task.topParentId);
-    const folderTitle = this._currentFolder ? null : this.getFolderName(task.immediateParentId);
-
-    const context = { task: { ...task._raw, groupTitle, folderTitle } };
-    const taskTemplate = this.renderTemplate('task', context, task.id);
-    if (taskTemplate) {
-      return taskTemplate;
-    }
-
-    let taskDetails = this.renderTemplate('task-details', context, `task-details-${task.id}`);
-
-    if (!taskDetails) {
-      const group =
-        this.dataSource === TasksSource.todo || this._currentGroup
-          ? null
-          : html`
-              <div class="TaskDetail TaskGroup">
-                ${this.renderPlannerIcon()}
-                <span>${this.getPlanTitle(task.topParentId)}</span>
-              </div>
-            `;
-
-      const folder = this._currentFolder
-        ? null
-        : html`
-            <div class="TaskDetail TaskBucket">
-              ${this.renderBucketIcon()}
-              <span>${this.getFolderName(task.immediateParentId)}</span>
-            </div>
-          `;
-
-      const taskDue = !dueDate
-        ? null
-        : html`
-            <div class="TaskDetail TaskDue">
-              <span>Due ${getShortDateString(dueDate)}</span>
-            </div>
-          `;
-
-      const taskPeople = this.dataSource !== TasksSource.todo ? this.renderAssignedPeople(task) : null;
-
-      taskDetails = html`
-        <div class="TaskTitle">
-          ${name}
-        </div>
-        ${group} ${folder} ${taskPeople} ${taskDue}
-      `;
-    }
-
-    const taskOptions =
-      this.readOnly || this.hideOptions
-        ? null
-        : html`
-            <div class="TaskOptions">
-              <mgt-dot-options
-                .options="${{
-                  'Delete Task': () => this.removeTask(task)
-                }}"
-              ></mgt-dot-options>
-            </div>
-          `;
-
-    return html`
-      <div
-        class=${classMap({
-          Complete: completed,
-          Incomplete: !completed,
-          ReadOnly: this.readOnly,
-          Task: true
-        })}
-      >
-        <div
-          class="TaskContent"
-          @click=${() => {
-            this.handleTaskClick(task);
-          }}
-        >
-          <span
-            class=${classMap({
-              Complete: completed,
-              Incomplete: !completed,
-              TaskCheckContainer: true
-            })}
-            @click="${e => {
-              if (!this.readOnly) {
-                if (!task.completed) {
-                  this.completeTask(task);
-                } else {
-                  this.uncompleteTask(task);
-                }
-
-                e.stopPropagation();
-                e.preventDefault();
-              }
-            }}"
-          >
-            ${taskCheck}
-          </span>
-          <div class="TaskDetailsContainer ${this.mediaQuery} ${this._currentGroup ? 'NoPlan' : ''}">
-            ${taskDetails}
-          </div>
-          ${taskOptions}
-
-          <div class="Divider"></div>
-        </div>
-      </div>
-    `;
-  }
-
-  private renderAssignedPeople(task: ITask) {
-    let assignedPeopleHTML = null;
-
-    const taskAssigneeClasses = {
-      NewTaskAssignee: task === null,
-      TaskAssignee: task !== null,
-      TaskDetail: task !== null
-    };
-
-    const assignedPeople = task
-      ? Object.keys(task.assignments).map(key => {
-          return key;
-        })
-      : [];
-
-    const noPeopleTemplate = html`
-      <template data-type="no-data">
-        <i class="login-icon ms-Icon ms-Icon--Contact"></i>
-      </template>
-    `;
-
-    const taskId = task ? task.id : 'newTask';
-
-    assignedPeopleHTML = html`
-      <mgt-people
-        class="people-${taskId}"
-        .userIds="${assignedPeople}"
-        .personCardInteraction=${this.isPeoplePickerVisible ? PersonCardInteraction.none : PersonCardInteraction.hover}
-        >${noPeopleTemplate}
-      </mgt-people>
-    `;
-
-    return html`
-      <mgt-flyout
-        class=${classMap(taskAssigneeClasses)}
-        @click=${(e: MouseEvent) => {
-          this.showPeoplePicker(task);
-          e.stopPropagation();
-        }}
-        .isOpen=${this.isPeoplePickerVisible && task === this._currentTask}
-      >
-        ${assignedPeopleHTML}
-        <div slot="flyout" class=${classMap({ Picker: true })}>
-          <mgt-people-picker
-            class="picker-${taskId}"
-            @click=${(e: MouseEvent) => e.stopPropagation()}
-          ></mgt-people-picker>
-        </div>
-      </mgt-flyout>
-    `;
-  }
-
   private handleTaskClick(task: ITask) {
     if (task && !this.isPeoplePickerVisible) {
       this.fireCustomEvent('taskClick', { task: task._raw });
     }
-  }
-
-  private renderLoadingTask() {
-    return html`
-      <div class="Task LoadingTask">
-        <div class="TaskContent">
-          <div class="TaskCheckContainer">
-            <div class="TaskCheck"></div>
-          </div>
-          <div class="TaskDetailsContainer">
-            <div class="TaskTitle"></div>
-            <div class="TaskDetails">
-              <span class="TaskDetail">
-                <div class="TaskDetailIcon"></div>
-                <div class="TaskDetailName"></div>
-              </span>
-              <span class="TaskDetail">
-                <div class="TaskDetailIcon"></div>
-                <div class="TaskDetailName"></div>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  private renderPlannerIcon() {
-    return html`
-      <svg width="16" height="18" viewBox="0 0 16 18" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path
-          fill-rule="evenodd"
-          clip-rule="evenodd"
-          d="M7.223 1.156C6.98 1.26 6.769 1.404 6.586 1.586C6.403 1.768 6.261 1.98 6.157 2.223C6.052 2.465 6 2.724 6 3H2V17H14V3H10C10 2.724 9.948 2.465 9.844 2.223C9.74 1.98 9.596 1.768 9.414 1.586C9.231 1.404 9.02 1.26 8.777 1.156C8.535 1.053 8.276 1 8 1C7.723 1 7.465 1.053 7.223 1.156ZM5 4H7V3C7 2.86 7.026 2.729 7.078 2.609C7.13 2.49 7.202 2.385 7.293 2.293C7.384 2.202 7.49 2.131 7.609 2.079C7.73 2.026 7.859 2 8 2C8.14 2 8.271 2.026 8.39 2.079C8.511 2.131 8.616 2.202 8.707 2.293C8.798 2.385 8.87 2.49 8.922 2.609C8.974 2.729 9 2.86 9 3V4H11V5H5V4ZM12 6V4H13V16H3V4H4V6H12Z"
-          fill="#3C3C3C"
-        />
-        <path
-          fill-rule="evenodd"
-          clip-rule="evenodd"
-          d="M7.35156 12.3517L5.49956 14.2037L4.14856 12.8517L4.85156 12.1487L5.49956 12.7967L6.64856 11.6487L7.35156 12.3517Z"
-          fill="#3C3C3C"
-        />
-        <path
-          fill-rule="evenodd"
-          clip-rule="evenodd"
-          d="M7.35156 8.35168L5.49956 10.2037L4.14856 8.85168L4.85156 8.14868L5.49956 8.79668L6.64856 7.64868L7.35156 8.35168Z"
-          fill="#3C3C3C"
-        />
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M8 14H12.001V13H8V14Z" fill="#3C3C3C" />
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M8 10H12.001V9H8V10Z" fill="#3C3C3C" />
-      </svg>
-    `;
-  }
-
-  private renderBucketIcon() {
-    return html`
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path
-          fill-rule="evenodd"
-          clip-rule="evenodd"
-          d="M14 2H2V4H3H5H6H10H11H13H14V2ZM10 5H6V6H10V5ZM5 5H3V14H13V5H11V6C11 6.55228 10.5523 7 10 7H6C5.44772 7 5 6.55228 5 6V5ZM1 5H2V14V15H3H13H14V14V5H15V4V2V1H14H2H1V2V4V5Z"
-          fill="#3C3C3C"
-        />
-      </svg>
-    `;
   }
 
   private getTaskSource(): ITaskSource {
