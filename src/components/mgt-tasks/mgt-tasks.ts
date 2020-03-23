@@ -125,51 +125,6 @@ const plannerAssignment = {
 };
 
 /**
- * foo
- *
- * @export
- * @class MgtTask
- * @extends {MgtTemplatedComponent}
- */
-@customElement('mgt-task')
-class MgtTask extends MgtTemplatedComponent {
-  /**
-   * foo
-   *
-   * @type {boolean}
-   * @memberof MgtTask
-   */
-  @property() public isCompleted: boolean;
-
-  /**
-   * The backing data source
-   *
-   * @type {IDynamicTask}
-   * @memberof MgtTask
-   */
-  @property({ attribute: 'task', type: Object })
-  public task: IDynamicTask;
-
-  /**
-   * Render the component
-   *
-   * @returns {TemplateResult}
-   * @memberof MgtTask
-   */
-  public render(): TemplateResult {
-    if (this.isLoadingState) {
-      return this.renderTemplate('loading', null);
-    }
-
-    if (!this.task) {
-      return this.renderTemplate('no-data', null);
-    }
-
-    return this.renderTemplate('default', { task: this.task });
-  }
-}
-
-/**
  * component enables the user to view, add, remove, complete, or edit tasks. It works with tasks in Microsoft Planner or Microsoft To-Do.
  *
  * @export
@@ -801,17 +756,6 @@ export class MgtTasks extends MgtTemplatedComponent {
     `;
   }
 
-  /*/////////////////////////////////////////////////////////////////
-
-  renderTask
-  renderTaskCheckbox
-  renderTaskContent
-  renderTaskOptions
-
-  deleteTask
-
-  ///////////////////////////////////////////////////////////////*/
-
   /**
    * Render a task.
    *
@@ -821,10 +765,54 @@ export class MgtTasks extends MgtTemplatedComponent {
    * @memberof MgtTasks
    */
   protected renderTask(task: ITask): TemplateResult {
-    const { name = 'Task', completed = false, dueDate } = task;
+    const { completed = false } = task;
 
+    // tslint:disable-next-line: no-string-literal
+    if (this.templates && this.templates['task']) {
+      const context = this.getTaskContext(task);
+      return this.renderTemplate('task', context, task.id);
+    }
+
+    const taskCheckTemplate = this.renderTaskCheck(task);
+    const taskDetailsTemplate = this.renderTaskDetails(task);
+    const taskOptionsTemplate = this.hideOptions ? null : this.renderTaskOptions(task);
+
+    return html`
+      <div
+        class=${classMap({
+          Complete: completed,
+          Incomplete: !completed,
+          ReadOnly: this.readOnly,
+          Task: true
+        })}
+      >
+        <div class="TaskContent" @click=${e => this.handleTaskClick(e, task)}>
+          <span class="TaskCheckContainer" @click="${e => this.handleTaskCheckClick(e, task)}">
+            ${taskCheckTemplate}
+          </span>
+          <div class="TaskDetailsContainer ${this.mediaQuery} ${this._currentGroup ? 'NoPlan' : ''}">
+            ${taskDetailsTemplate}
+          </div>
+          <div class="TaskOptions">
+            ${taskOptionsTemplate}
+          </div>
+          <div class="Divider"></div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Render the checkbox part of a task.
+   *
+   * @protected
+   * @param {IDynamicTask} task
+   * @returns {TemplateResult}
+   * @memberof MgtTasks
+   */
+  protected renderTaskCheck(task: IDynamicTask): TemplateResult {
     const isLoading = this._loadingTasks.includes(task.id);
-
+    const completed = task.completed || false;
     const taskCheckClasses = {
       Complete: !isLoading && completed,
       Loading: isLoading,
@@ -842,117 +830,82 @@ export class MgtTasks extends MgtTemplatedComponent {
         `
       : null;
 
-    const taskCheck = html`
+    return html`
       <span class=${classMap(taskCheckClasses)}><span class="TaskCheckContent">${taskCheckContent}</span></span>
     `;
+  }
 
-    const groupTitle = this._currentGroup ? null : this.getPlanTitle(task.topParentId);
-    const folderTitle = this._currentFolder ? null : this.getFolderName(task.immediateParentId);
-
-    const context = { task: { ...task._raw, groupTitle, folderTitle } };
-    const taskTemplate = this.renderTemplate('task', context, task.id);
-    if (taskTemplate) {
-      return taskTemplate;
+  /**
+   * foo
+   *
+   * @protected
+   * @param {IDynamicTask} task
+   * @returns {TemplateResult}
+   * @memberof MgtTasks
+   */
+  protected renderTaskDetails(task: IDynamicTask): TemplateResult {
+    if (this.templates && this.templates['task-details']) {
+      const context = this.getTaskContext(task);
+      return this.renderTemplate('task-details', context, `task-details-${task.id}`);
     }
 
-    let taskDetails = this.renderTemplate('task-details', context, `task-details-${task.id}`);
+    const taskName = task.name || 'Task';
 
-    if (!taskDetails) {
-      const group =
-        this.dataSource === TasksSource.todo || this._currentGroup
-          ? null
-          : html`
-              <div class="TaskDetail TaskGroup">
-                ${this.renderPlannerIcon()}
-                <span>${this.getPlanTitle(task.topParentId)}</span>
-              </div>
-            `;
-
-      const folder = this._currentFolder
+    const group =
+      this.dataSource === TasksSource.todo || this._currentGroup
         ? null
         : html`
-            <div class="TaskDetail TaskBucket">
-              ${this.renderBucketIcon()}
-              <span>${this.getFolderName(task.immediateParentId)}</span>
+            <div class="TaskDetail TaskGroup">
+              ${this.renderPlannerIcon()}
+              <span>${this.getPlanTitle(task.topParentId)}</span>
             </div>
           `;
 
-      const taskDue = !dueDate
-        ? null
-        : html`
-            <div class="TaskDetail TaskDue">
-              <span>Due ${getShortDateString(dueDate)}</span>
-            </div>
-          `;
+    const folder = this._currentFolder
+      ? null
+      : html`
+          <div class="TaskDetail TaskBucket">
+            ${this.renderBucketIcon()}
+            <span>${this.getFolderName(task.immediateParentId)}</span>
+          </div>
+        `;
 
-      const taskPeople = this.dataSource !== TasksSource.todo ? this.renderAssignedPeople(task) : null;
+    const taskDue = !task.dueDate
+      ? null
+      : html`
+          <div class="TaskDetail TaskDue">
+            <span>Due ${getShortDateString(task.dueDate)}</span>
+          </div>
+        `;
 
-      taskDetails = html`
-        <div class="TaskTitle">
-          ${name}
-        </div>
-        ${group} ${folder} ${taskPeople} ${taskDue}
-      `;
-    }
-
-    const taskOptions =
-      this.readOnly || this.hideOptions
-        ? null
-        : html`
-            <div class="TaskOptions">
-              <mgt-dot-options
-                .options="${{
-                  'Delete Task': () => this.removeTask(task)
-                }}"
-              ></mgt-dot-options>
-            </div>
-          `;
+    const taskPeople = this.dataSource !== TasksSource.todo ? this.renderAssignedPeople(task) : null;
 
     return html`
-      <div
-        class=${classMap({
-          Complete: completed,
-          Incomplete: !completed,
-          ReadOnly: this.readOnly,
-          Task: true
-        })}
-      >
-        <div
-          class="TaskContent"
-          @click=${() => {
-            this.handleTaskClick(task);
-          }}
-        >
-          <span
-            class=${classMap({
-              Complete: completed,
-              Incomplete: !completed,
-              TaskCheckContainer: true
-            })}
-            @click="${e => {
-              if (!this.readOnly) {
-                if (!task.completed) {
-                  this.completeTask(task);
-                } else {
-                  this.uncompleteTask(task);
-                }
-
-                e.stopPropagation();
-                e.preventDefault();
-              }
-            }}"
-          >
-            ${taskCheck}
-          </span>
-          <div class="TaskDetailsContainer ${this.mediaQuery} ${this._currentGroup ? 'NoPlan' : ''}">
-            ${taskDetails}
-          </div>
-          ${taskOptions}
-
-          <div class="Divider"></div>
-        </div>
+      <div class="TaskTitle">
+        ${taskName}
       </div>
+      ${group} ${folder} ${taskPeople} ${taskDue}
     `;
+  }
+
+  /**
+   * foo
+   *
+   * @protected
+   * @param {IDynamicTask} task
+   * @returns {TemplateResult}
+   * @memberof MgtTasks
+   */
+  protected renderTaskOptions(task: IDynamicTask): TemplateResult {
+    return this.readOnly
+      ? null
+      : html`
+          <mgt-dot-options
+            .options="${{
+              'Delete Task': () => this.removeTask(task)
+            }}"
+          ></mgt-dot-options>
+        `;
   }
 
   /**
@@ -1109,6 +1062,36 @@ export class MgtTasks extends MgtTemplatedComponent {
     }
 
     this._me = await getMe(graph);
+  }
+
+  /*/////////////////////////////////////////////////////////////////
+
+  renderTask
+  renderTaskCheck
+  renderTaskContent
+  renderTaskOptions
+
+  deleteTask
+
+  ///////////////////////////////////////////////////////////////*/
+
+  private getTaskContext(task: IDynamicTask) {
+    const groupTitle = this._currentGroup ? null : this.getPlanTitle(task.topParentId);
+    const folderTitle = this._currentFolder ? null : this.getFolderName(task.immediateParentId);
+    return { task: { ...task._raw, groupTitle, folderTitle } };
+  }
+
+  private handleTaskCheckClick(e: MouseEvent, task: IDynamicTask): void {
+    if (!this.readOnly) {
+      if (!task.completed) {
+        this.completeTask(task);
+      } else {
+        this.uncompleteTask(task);
+      }
+
+      e.stopPropagation();
+      e.preventDefault();
+    }
   }
 
   private getTaskSource(dataSource: TasksSource, graph: Graph): ITaskSource {
@@ -1398,7 +1381,7 @@ export class MgtTasks extends MgtTemplatedComponent {
     return mgtPeople;
   }
 
-  private handleTaskClick(task: ITask) {
+  private handleTaskClick(e: MouseEvent, task: ITask) {
     if (task && !this._isPeoplePickerVisible) {
       this.fireCustomEvent('taskClick', { task: task._raw });
     }

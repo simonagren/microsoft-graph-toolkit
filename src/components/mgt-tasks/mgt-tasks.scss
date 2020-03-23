@@ -596,13 +596,6 @@ mgt-tasks,
       user-select: none;
       -moz-user-select: none;
       -ms-user-select: none;
-      &.Complete {
-        .TaskCheck {
-          background-color: $task-icon-background-completed;
-          border: $task-icon-border-completed;
-          color: $task-icon-color-completed;
-        }
-      }
     }
 
     .TaskCheck {
@@ -624,6 +617,11 @@ mgt-tasks,
       -ms-user-select: none;
       &.Loading .TaskCheckContent {
         animation: rotateIcon 2s infinite linear;
+      }
+      &.Complete {
+        background-color: $task-icon-background-completed;
+        border: $task-icon-border-completed;
+        color: $task-icon-color-completed;
       }
     }
 
