@@ -168,8 +168,11 @@ export class MgtTeamsChannelPicker extends MgtTemplatedComponent {
   }
 
   private set items(value) {
+    if (this._items === value) {
+      return;
+    }
     this._items = value;
-    this._treeViewState = this.generateTreeViewState(value);
+    this._treeViewState = value ? this.generateTreeViewState(value) : [];
     this.resetFocusState();
   }
   private get items(): DropdownItem[] {
@@ -191,8 +194,6 @@ export class MgtTeamsChannelPicker extends MgtTemplatedComponent {
   private _focusedIndex: number = -1;
   private debouncedSearch;
 
-  // determines loading state
-  @property({ attribute: false }) private isLoading;
   @property({ attribute: false }) private _isDropdownVisible;
 
   constructor() {
@@ -235,7 +236,7 @@ export class MgtTeamsChannelPicker extends MgtTemplatedComponent {
     if (provider && provider.state === ProviderState.SignedIn) {
       // since the component normally handles loading on hover, forces the load for items
       if (!this.items) {
-        await this.loadTeams();
+        await this.requestStateUpdate();
       }
 
       let foundChannel: ChannelPickerItemState;
@@ -365,12 +366,12 @@ export class MgtTeamsChannelPicker extends MgtTemplatedComponent {
    * @memberof MgtTeamsChannelPicker
    */
   protected renderDropdown() {
-    if (this.isLoading || !this._treeViewState) {
+    if (this.isLoadingState) {
       return this.renderLoading();
     }
 
     if (this._treeViewState) {
-      if (!this.isLoading && this._treeViewState.length === 0 && this._inputValue.length > 0) {
+      if (!this.isLoadingState && this._treeViewState.length === 0 && this._inputValue.length > 0) {
         return this.renderError();
       }
 
@@ -538,6 +539,41 @@ export class MgtTeamsChannelPicker extends MgtTemplatedComponent {
     );
   }
 
+  // not using loadState because we want to load the teams only when needed
+  protected async loadState() {
+    const provider = Providers.globalProvider;
+    let teams: MicrosoftGraph.Team[];
+    if (provider && provider.state === ProviderState.SignedIn) {
+      const graph = provider.graph.forComponent(this);
+
+      teams = await getAllMyTeams(graph);
+
+      const batch = provider.graph.createBatch();
+
+      for (const [i, team] of teams.entries()) {
+        batch.get(`${i}`, `teams/${team.id}/channels`, ['user.read.all']);
+      }
+      const response = await batch.execute();
+      this.items = teams.map(t => {
+        return {
+          item: t
+        };
+      });
+      for (const [i] of teams.entries()) {
+        if (response[i] && response[i].value) {
+          this.items[i].channels = response[i].value.map(c => {
+            return {
+              item: c
+            };
+          });
+        }
+      }
+    }
+    this.items = this.items;
+    this.filterList();
+    this.resetFocusState();
+  }
+
   private handleItemClick(item: ChannelPickerItemState) {
     if (item.channels) {
       item.isExpanded = !item.isExpanded;
@@ -631,7 +667,7 @@ export class MgtTeamsChannelPicker extends MgtTemplatedComponent {
 
   private loadTeamsIfNotLoaded() {
     if (!this.items && !this.isLoadingState) {
-      this.loadTeams();
+      this.requestStateUpdate();
     }
   }
 
@@ -714,43 +750,6 @@ export class MgtTeamsChannelPicker extends MgtTemplatedComponent {
         event.preventDefault();
         break;
     }
-  }
-
-  // not using loadState because we want to load the teams only when needed
-  private async loadTeams() {
-    const provider = Providers.globalProvider;
-    let teams: MicrosoftGraph.Team[];
-    if (provider && provider.state === ProviderState.SignedIn) {
-      const graph = provider.graph.forComponent(this);
-
-      teams = await getAllMyTeams(graph);
-
-      this.isLoading = true;
-      const batch = provider.graph.createBatch();
-
-      for (const [i, team] of teams.entries()) {
-        batch.get(`${i}`, `teams/${team.id}/channels`, ['user.read.all']);
-      }
-      const response = await batch.execute();
-      this.items = teams.map(t => {
-        return {
-          item: t
-        };
-      });
-      for (const [i] of teams.entries()) {
-        if (response[i] && response[i].value) {
-          this.items[i].channels = response[i].value.map(c => {
-            return {
-              item: c
-            };
-          });
-        }
-      }
-    }
-    this.items = this.items;
-    this.filterList();
-    this.resetFocusState();
-    this.isLoading = false;
   }
 
   private gainedFocus() {
