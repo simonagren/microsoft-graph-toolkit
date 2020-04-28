@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <script type="module" src="../../../dist/es6/index.js"></script>
+    <script type="module" src="../../../dist/es6/mock/mgt-mock-provider.js"></script>
+  </head>
+  <body>
+    <mgt-msal-provider
+      client-id="a974dfa0-9f57-49b9-95db-90f04ce2111a"
+      scopes="user.read,people.read,user.readbasic.all,contacts.read,calendars.read"
+      depends-on="mgt-teams-provider"
+    ></mgt-msal-provider>
+
+    <mgt-login></mgt-login>
+    <mgt-todo></mgt-todo>
+  </body>
+</html>
