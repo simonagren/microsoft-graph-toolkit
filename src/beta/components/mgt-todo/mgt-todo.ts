@@ -268,13 +268,14 @@ export class MgtTodo extends MgtTemplatedComponent {
       }
     }
 
-    const headerTemplate = !this.hideHeader
-      ? html`
-          <div class="Header">
-            ${this.renderHeader()}
-          </div>
-        `
-      : null;
+    const headerTemplate =
+      !this.hideHeader && this._lists && this._lists.length
+        ? html`
+            <div class="Header">
+              ${this.renderHeader()}
+            </div>
+          `
+        : null;
 
     const newTaskTemplate = this._isNewTaskVisible ? this.renderNewTaskPanel() : null;
     const loadingTemplate = this.isLoadingState || this._isLoadingTasks ? this.renderLoadingTask() : null;
@@ -427,17 +428,18 @@ export class MgtTodo extends MgtTemplatedComponent {
       listOptions[l.displayName] = () => this.loadTaskList(l);
     }
 
-    const listSelect = this.targetId
-      ? html`
-          <span class="PlanTitle">
-            ${list.displayName}
-          </span>
-        `
-      : this._currentList
-      ? html`
-          <mgt-arrow-options .value="${this._currentList.displayName}" .options="${listOptions}"></mgt-arrow-options>
-        `
-      : null;
+    const listSelect =
+      this.targetId && list
+        ? html`
+            <span class="PlanTitle">
+              ${list.displayName}
+            </span>
+          `
+        : this._currentList
+        ? html`
+            <mgt-arrow-options .value="${this._currentList.displayName}" .options="${listOptions}"></mgt-arrow-options>
+          `
+        : null;
 
     return html`
       <span class="TitleCont">
@@ -617,9 +619,13 @@ export class MgtTodo extends MgtTemplatedComponent {
     this._graph = betaGraph;
 
     if (!this._lists || !this._lists.length) {
-      const lists = this.targetId
-        ? [await getTodoTaskList(this._graph, this.targetId)]
-        : await getTodoTaskLists(this._graph);
+      let lists;
+      if (this.targetId) {
+        const targetList = await getTodoTaskList(this._graph, this.targetId);
+        lists = targetList ? [targetList] : [];
+      } else {
+        lists = await getTodoTaskLists(this._graph);
+      }
 
       let currentList = null;
       if (lists && lists.length) {
