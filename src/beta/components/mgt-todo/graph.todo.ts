@@ -100,7 +100,7 @@ export async function getTodoTask(graph: IGraph, listId: string, taskId: string)
     .middlewareOptions(prepScopes('Tasks.Read'))
     .get();
 
-  return task && task.value;
+  return task;
 }
 
 /**
@@ -135,7 +135,7 @@ export async function getTodoTaskList(graph: IGraph, listId: string): Promise<To
     .middlewareOptions(prepScopes('Tasks.Read'))
     .get();
 
-  return taskList && taskList.value;
+  return taskList;
 }
 
 /**
