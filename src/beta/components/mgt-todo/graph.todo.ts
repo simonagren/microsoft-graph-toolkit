@@ -67,7 +67,7 @@ export interface TodoTaskList {
 // tslint:enable
 
 /**
- * foo
+ * Get all todo tasks for a specific task list.
  *
  * @export
  * @param {IGraph} graph
@@ -85,7 +85,7 @@ export async function getTodoTasks(graph: IGraph, listId: string): Promise<TodoT
 }
 
 /**
- * foo
+ * Get a specific todo task.
  *
  * @export
  * @param {IGraph} graph
@@ -104,7 +104,7 @@ export async function getTodoTask(graph: IGraph, listId: string, taskId: string)
 }
 
 /**
- * foo
+ * get all todo task lists
  *
  * @export
  * @param {IGraph} graph
@@ -121,7 +121,7 @@ export async function getTodoTaskLists(graph: IGraph): Promise<TodoTaskList[]> {
 }
 
 /**
- * foo
+ * Get a specific todo task list.
  *
  * @export
  * @param {IGraph} graph
@@ -139,19 +139,19 @@ export async function getTodoTaskList(graph: IGraph, listId: string): Promise<To
 }
 
 /**
- * foo
+ * Create a new todo task.
  *
  * @export
  * @param {IGraph} graph
  * @param {string} listId
- * @param {{ title: string }} taskData
+ * @param {{ title: string; dueDateTime: { dateTime: string; timeZone: string } }} taskData
  * @returns {Promise<TodoTask>}
  */
 export async function createTodoTask(
   graph: IGraph,
   listId: string,
   // tslint:disable-next-line: completed-docs
-  taskData: { title: string }
+  taskData: { title: string; dueDateTime: { dateTime: string; timeZone: string } }
 ): Promise<TodoTask> {
   const task: TodoTask = await graph
     .api(`/me/todo/lists/${listId}/tasks`)
@@ -163,7 +163,7 @@ export async function createTodoTask(
 }
 
 /**
- * foo
+ * Create a new todo task list.
  *
  * @export
  * @param {IGraph} graph
@@ -182,7 +182,7 @@ export async function createTodoTaskList(graph: IGraph, listData: { displayName:
 }
 
 /**
- * foo
+ * Delete a todo task.
  *
  * @export
  * @param {IGraph} graph
@@ -199,7 +199,7 @@ export async function deleteTodoTask(graph: IGraph, listId: string, taskId: stri
 }
 
 /**
- * foo
+ * Delete a todo task list.
  *
  * @export
  * @param {IGraph} graph
@@ -215,7 +215,7 @@ export async function deleteTodoTaskList(graph: IGraph, listId: string): Promise
 }
 
 /**
- * foo
+ * Update a todo task.
  *
  * @export
  * @param {IGraph} graph
@@ -240,7 +240,7 @@ export async function updateTodoTask(
 }
 
 /**
- * foo
+ * Update a todo task list.
  *
  * @export
  * @param {IGraph} graph

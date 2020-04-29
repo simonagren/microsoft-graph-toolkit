@@ -290,7 +290,7 @@ export class MgtTodo extends MgtTemplatedComponent {
   }
 
   /**
-   * foo
+   * Render the new task input panel.
    *
    * @protected
    * @returns
@@ -344,8 +344,8 @@ export class MgtTodo extends MgtTemplatedComponent {
           </span>
         `;
 
-    const taskDue = null;
-    /*const taskDue = html`
+    // const taskDue = null;
+    const taskDue = html`
       <span class="NewTaskDue">
         <input
           type="date"
@@ -363,7 +363,7 @@ export class MgtTodo extends MgtTemplatedComponent {
           }}"
         />
       </span>
-    `;*/
+    `;
 
     const taskAdd = this._newTaskBeingAdded
       ? html`
@@ -398,7 +398,7 @@ export class MgtTodo extends MgtTemplatedComponent {
   }
 
   /**
-   * foo
+   * Render the header part of the component.
    *
    * @protected
    * @returns
@@ -450,7 +450,7 @@ export class MgtTodo extends MgtTemplatedComponent {
   }
 
   /**
-   * foo
+   * Render a task in a loading state.
    *
    * @protected
    * @returns
@@ -482,7 +482,7 @@ export class MgtTodo extends MgtTemplatedComponent {
   }
 
   /**
-   * foo
+   * Render a bucket icon.
    *
    * @protected
    * @returns
@@ -502,7 +502,7 @@ export class MgtTodo extends MgtTemplatedComponent {
   }
 
   /**
-   * foo
+   * Render a task in the list.
    *
    * @protected
    * @param {TodoTask} task
@@ -697,6 +697,10 @@ export class MgtTodo extends MgtTemplatedComponent {
 
       const listId = this._currentList.id;
       const taskData = {
+        dueDateTime: {
+          dateTime: this._newTaskDueDate.toISOString(),
+          timeZone: 'UTC'
+        },
         title: this._newTaskName
       };
 
