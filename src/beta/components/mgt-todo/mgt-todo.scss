@@ -175,8 +175,8 @@ mgt-todo,
         flex: 1;
         display: grid;
         display: -ms-grid;
-        grid-template-columns: auto 1fr;
-        -ms-grid-columns: auto 1fr;
+        grid-template-columns: 1fr auto;
+        -ms-grid-columns: 1fr auto;
         grid-template-rows: auto auto auto auto;
         -ms-grid-rows: auto auto auto auto;
         justify-content: space-between;
