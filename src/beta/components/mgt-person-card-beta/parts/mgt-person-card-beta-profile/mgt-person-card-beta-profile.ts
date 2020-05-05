@@ -6,39 +6,28 @@
  */
 
 import { customElement, html, property, TemplateResult } from 'lit-element';
+import { MgtTemplatedComponent } from '../../../../../components/templatedComponent';
 import { Providers } from '../../../../../Providers';
 import { ProviderState } from '../../../../../providers/IProvider';
 import { BetaGraph } from '../../../../BetaGraph';
-import { BasePersonCardSection } from '../BasePersonCardSection';
 import { getProfile, IPersonAnniversary, IPersonInterest, IProfile } from './graph.profile';
-import { styles } from './mgt-person-card-profile-css';
+import { styles } from './mgt-person-card-beta-profile-css';
 
 /**
  * foo
  *
  * @export
- * @class MgtPersonCardProfile
+ * @class MgtPersonCardBetaProfile
  * @extends {MgtTemplatedComponent}
  */
-@customElement('mgt-person-card-profile')
-export class MgtPersonCardProfile extends BasePersonCardSection {
+@customElement('mgt-person-card-beta-profile')
+export class MgtPersonCardBetaProfile extends MgtTemplatedComponent {
   /**
    * Array of styles to apply to the element. The styles should be defined
    * using the `css` tag function.
    */
   static get styles() {
     return styles;
-  }
-
-  /**
-   * foo
-   *
-   * @readonly
-   * @type {string}
-   * @memberof MgtPersonCardProfile
-   */
-  public get displayName(): string {
-    return 'Profile';
   }
 
   /**
@@ -54,66 +43,6 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
   private personalInterests: IPersonInterest[];
   private professionalInterests: IPersonInterest[];
   private birthdayAnniversary: IPersonAnniversary;
-
-  constructor() {
-    super();
-
-    this.userId = null;
-    this.profile = null;
-    this.personalInterests = null;
-    this.professionalInterests = null;
-    this.birthdayAnniversary = null;
-  }
-
-  /**
-   * Synchronizes property values when attributes change.
-   *
-   * @param {*} name
-   * @param {*} oldValue
-   * @param {*} newValue
-   * @memberof MgtPersonCardProfile
-   */
-  public attributeChangedCallback(name: string, oldValue: string, newValue: string) {
-    super.attributeChangedCallback(name, oldValue, newValue);
-
-    if (oldValue === newValue) {
-      return;
-    }
-
-    switch (name) {
-      case 'user-id':
-        this.profile = null;
-        this.personalInterests = null;
-        this.professionalInterests = null;
-        this.birthdayAnniversary = null;
-        this.requestStateUpdate();
-        break;
-    }
-  }
-
-  /**
-   * foo
-   *
-   * @returns {TemplateResult}
-   * @memberof MgtPersonCardProfile
-   */
-  public renderCompactView(): TemplateResult {
-    return html`
-      compact view
-    `;
-  }
-
-  /**
-   * foo
-   *
-   * @returns {TemplateResult}
-   * @memberof MgtPersonCardProfile
-   */
-  public renderIcon(): TemplateResult {
-    return html`
-      icon
-    `;
-  }
 
   /**
    * Invoked on each update to perform rendering tasks. This method must return
@@ -143,7 +72,7 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
    *
    * @protected
    * @returns
-   * @memberof MgtPersonCardProfile
+   * @memberof MgtPersonCardBetaProfile
    */
   protected renderLanguages(): TemplateResult {
     let contentTemplate: TemplateResult;
@@ -197,7 +126,7 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
    *
    * @protected
    * @returns {TemplateResult}
-   * @memberof MgtPersonCardProfile
+   * @memberof MgtPersonCardBetaProfile
    */
   protected renderSkills(): TemplateResult {
     let contentTemplate: TemplateResult;
@@ -238,7 +167,7 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
    *
    * @protected
    * @returns {TemplateResult}
-   * @memberof MgtPersonCardProfile
+   * @memberof MgtPersonCardBetaProfile
    */
   protected renderWorkExperience(): TemplateResult {
     let contentTemplate: TemplateResult;
@@ -291,7 +220,7 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
    *
    * @protected
    * @returns {TemplateResult}
-   * @memberof MgtPersonCardProfile
+   * @memberof MgtPersonCardBetaProfile
    */
   protected renderEducation(): TemplateResult {
     let contentTemplate: TemplateResult;
@@ -343,7 +272,7 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
    *
    * @protected
    * @returns {TemplateResult}
-   * @memberof MgtPersonCardProfile
+   * @memberof MgtPersonCardBetaProfile
    */
   protected renderProfessionalInterests(): TemplateResult {
     let contentTemplate: TemplateResult;
@@ -384,7 +313,7 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
    *
    * @protected
    * @returns {TemplateResult}
-   * @memberof MgtPersonCardProfile
+   * @memberof MgtPersonCardBetaProfile
    */
   protected renderPersonalInterests(): TemplateResult {
     let contentTemplate: TemplateResult;
@@ -425,7 +354,7 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
    *
    * @protected
    * @returns {TemplateResult}
-   * @memberof MgtPersonCardProfile
+   * @memberof MgtPersonCardBetaProfile
    */
   protected renderBirthday(): TemplateResult {
     let contentTemplate: TemplateResult;
@@ -467,10 +396,10 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
    * load state into the component
    *
    * @protected
-   * @returns {Promise<void>}
-   * @memberof MgtPersonCardProfile
+   * @returns
+   * @memberof MgtPersonCard
    */
-  protected async loadState(): Promise<void> {
+  protected async loadState() {
     const provider = Providers.globalProvider;
 
     // check if user is signed in
@@ -488,25 +417,27 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
     const userId = this.userId;
     const profile = await getProfile(betaGraph, userId);
 
+    this.injectDummyData(profile);
+
     this.profile = profile;
-    this.birthdayAnniversary = profile.anniversaries ? profile.anniversaries.find(this.isBirthdayAnniversary) : null;
-    this.personalInterests = profile.interests ? profile.interests.filter(this.isPersonalInterest) : null;
-    this.professionalInterests = profile.interests ? profile.interests.filter(this.isProfessionalInterest) : null;
+    this.birthdayAnniversary = profile.anniversaries.find(this.isBirthdayAnniversary);
+    this.personalInterests = profile.interests.filter(this.isPersonalInterest);
+    this.professionalInterests = profile.interests.filter(this.isProfessionalInterest);
   }
 
-  private isPersonalInterest(interest: IPersonInterest): boolean {
+  private isPersonalInterest(interest) {
     return interest.categories && interest.categories.includes('personal');
   }
 
-  private isProfessionalInterest(interest: IPersonInterest): boolean {
+  private isProfessionalInterest(interest) {
     return interest.categories && interest.categories.includes('professional');
   }
 
-  private isBirthdayAnniversary(anniversary: IPersonAnniversary): boolean {
+  private isBirthdayAnniversary(anniversary) {
     return anniversary.type === 'birthday';
   }
 
-  private getDisplayDate(date: Date): string {
+  private getDisplayDate(date) {
     return date.toLocaleString('default', {
       day: 'numeric',
       month: 'long'
@@ -514,7 +445,7 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
   }
 
   // tslint:disable-next-line: completed-docs
-  private getDisplayDateRange(event: { startMonthYear: Date; endMonthYear: Date }): string {
+  private getDisplayDateRange(event): string {
     const start = new Date(event.startMonthYear).getFullYear();
     if (start === 0) {
       return null;
@@ -524,13 +455,13 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
     return `${start} — ${end}`;
   }
 
-  private handleTokenOverflow(section: HTMLElement): void {
+  private handleTokenOverflow(section) {
     const tokenLists = section.querySelectorAll('.token-list');
     if (!tokenLists || !tokenLists.length) {
       return;
     }
 
-    for (const tokenList of Array.from(tokenLists)) {
+    for (const tokenList of tokenLists) {
       const items = tokenList.querySelectorAll('.token-list__item');
       if (!items || !items.length) {
         continue;
@@ -539,7 +470,7 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
       let itemRect = items[0].getBoundingClientRect();
       const tokenListRect = tokenList.getBoundingClientRect();
       const maxtop = itemRect.height * 2 + tokenListRect.top;
-      let overflowItems: Element[] = null;
+      let overflowItems = null;
       for (let i = 0; i < items.length; i++) {
         itemRect = items[i].getBoundingClientRect();
         if (itemRect.top > maxtop) {
@@ -586,4 +517,124 @@ export class MgtPersonCardProfile extends BasePersonCardSection {
       line.style.left = `${left}px`;
     }
   }
+
+  // tslint:disable
+  private injectDummyData(profile) {
+    profile.languages.push({ displayName: 'English', proficiency: 'Native' });
+    profile.languages.push({ displayName: 'Macedonian', proficiency: 'Native' });
+    profile.languages.push({ displayName: 'Czech' });
+    profile.skills.push({ displayName: 'Program Management' });
+    profile.skills.push({ displayName: 'Microsoft Word 1983' });
+    profile.skills.push({ displayName: 'REST API Design' });
+    profile.skills.push({ displayName: 'Microsoft Graph Toolkit' });
+    profile.skills.push({ displayName: 'Software Design' });
+    profile.skills.push({ displayName: 'UX Prototyping' });
+    profile.positions.push({
+      detail: {
+        startMonthYear: new Date(2016, 1),
+        jobTitle: 'PM Architect',
+        company: {
+          displayName: 'Microsoft Corporation',
+          address: {
+            city: 'Seattle',
+            state: 'WA'
+          }
+        }
+      }
+    });
+    profile.positions.push({
+      detail: {
+        startMonthYear: new Date(2013, 1),
+        endMonthYear: new Date(2014, 1),
+        jobTitle: 'PM Architect',
+        company: {
+          displayName: 'Microsoft Corporation',
+          address: {
+            city: 'Seattle',
+            state: 'WA'
+          }
+        }
+      }
+    });
+    profile.positions.push({
+      detail: {
+        startMonthYear: new Date(2010, 1),
+        endMonthYear: new Date(2012, 1),
+        jobTitle: 'UX Designer',
+        company: {
+          displayName: 'Apple',
+          address: {
+            city: 'Seattle',
+            state: 'WA'
+          }
+        }
+      }
+    });
+    profile.positions.push({
+      detail: {
+        startMonthYear: new Date(2009, 1),
+        endMonthYear: new Date(2012, 1),
+        jobTitle: 'UX Designer',
+        company: {
+          displayName: 'IBM',
+          address: {
+            city: 'Seattle',
+            state: 'WA'
+          }
+        }
+      }
+    });
+    profile.educationalActivities.push({
+      startMonthYear: new Date(2016, 1),
+      institution: {
+        displayName: 'University of Phoenix'
+      },
+      program: {
+        displayName: "Bachelor's Degree"
+      }
+    });
+    profile.educationalActivities.push({
+      startMonthYear: new Date(2013, 1),
+      endMonthYear: new Date(2014, 1),
+      institution: {
+        displayName: 'Harvard Business School'
+      },
+      program: {
+        displayName: "Bachelor's Degree"
+      }
+    });
+    profile.educationalActivities.push({
+      startMonthYear: new Date(2013, 1),
+      endMonthYear: new Date(2014, 1),
+      institution: {
+        displayName: 'Harvard Business School'
+      },
+      program: {
+        displayName: "Bachelor's Degree"
+      }
+    });
+    profile.educationalActivities.push({
+      startMonthYear: new Date(2013, 1),
+      endMonthYear: new Date(2014, 1),
+      institution: {
+        displayName: 'Harvard Business School'
+      },
+      program: {
+        displayName: "Bachelor's Degree"
+      }
+    });
+    profile.interests.push({ categories: ['professional'], displayName: 'Machine Learning' });
+    profile.interests.push({ categories: ['professional'], displayName: 'REST' });
+    profile.interests.push({ categories: ['professional'], displayName: 'UX Design' });
+    profile.interests.push({ categories: ['professional'], displayName: 'API Design' });
+    profile.interests.push({ categories: ['professional'], displayName: 'AI Ethics' });
+    profile.interests.push({ categories: ['personal'], displayName: 'Seattle Sounders' });
+    profile.interests.push({ categories: ['personal'], displayName: 'Skiing' });
+    profile.interests.push({ categories: ['personal'], displayName: 'Chelsea FC' });
+    profile.interests.push({ categories: ['personal'], displayName: 'Swimming' });
+    profile.interests.push({ categories: ['personal'], displayName: 'Hiking' });
+    profile.interests.push({ categories: ['personal'], displayName: 'Sound Design' });
+    profile.anniversaries.push({ date: new Date(1989, 9, 17), type: 'birthday' });
+  }
+  // tslint:enable
 }

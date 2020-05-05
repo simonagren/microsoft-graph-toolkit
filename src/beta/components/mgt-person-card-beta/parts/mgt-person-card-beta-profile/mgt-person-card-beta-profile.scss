@@ -35,10 +35,7 @@
 }
 
 .token-list__item {
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: inline-block;
-  overflow: hidden;
+  display: flex;
   font-size: 14px;
   align-items: center;
   background: #f3f2f1;
