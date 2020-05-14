@@ -44,23 +44,6 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
   public hideOptions: boolean;
 
   /**
-   * Get whether new task view is visible
-   *
-   * @memberof MgtTasks
-   */
-  public get isNewTaskVisible() {
-    return this._isNewTaskVisible;
-  }
-  public set isNewTaskVisible(value: boolean) {
-    if (value !== this._isNewTaskVisible) {
-      this._isNewTaskVisible = value;
-      if (!value) {
-        this.clearNewTaskData();
-      }
-    }
-  }
-
-  /**
    * foo
    *
    * @readonly
@@ -72,18 +55,9 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
     return this._newTaskName;
   }
 
-  /**
-   * foo
-   *
-   * @protected
-   * @type {boolean}
-   * @memberof MgtTasksBase
-   */
-  @property() protected isNewTaskBeingAdded: boolean;
-
-  @property() private _isNewTaskVisible: boolean;
-  @property() private _newTaskName: string;
-
+  private _isNewTaskBeingAdded: boolean;
+  private _isNewTaskVisible: boolean;
+  private _newTaskName: string;
   private _previousMediaQuery: ComponentMediaQuery;
 
   constructor() {
@@ -121,7 +95,7 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
    */
   protected render() {
     const headerTemplate = !this.hideHeader ? this.renderHeader() : null;
-    const newTaskTemplate = this.isNewTaskVisible ? this.renderNewTaskPanel() : null;
+    const newTaskTemplate = this._isNewTaskVisible ? this.renderNewTaskPanel() : null;
     const tasksTemplate = this.isLoadingState ? this.renderLoadingTask() : this.renderTasks();
 
     return html`
@@ -143,9 +117,9 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
     const headerContentTemplate = this.renderHeaderContent();
 
     const addButton =
-      !this.readOnly && !this.isNewTaskVisible
+      !this.readOnly && !this._isNewTaskVisible
         ? html`
-            <button class="AddBarItem NewTaskButton" @click="${() => (this.isNewTaskVisible = true)}">
+            <button class="AddBarItem NewTaskButton" @click="${() => this.showNewTaskPanel()}">
               <span class="TaskIcon">\uE710</span>
               <span>Add</span>
             </button>
@@ -211,17 +185,18 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
         role="input"
         @input="${(e: Event) => {
           this._newTaskName = (e.target as HTMLInputElement).value;
+          this.requestUpdate();
         }}"
       />
     `;
 
     const taskAddClasses = classMap({
-      Disabled: !this.isNewTaskBeingAdded && (!newTaskName || !newTaskName.length),
+      Disabled: !this._isNewTaskBeingAdded && (!newTaskName || !newTaskName.length),
       TaskAddButtonContainer: true
     });
-    const taskAddTemplate = !this.isNewTaskBeingAdded
+    const taskAddTemplate = !this._isNewTaskBeingAdded
       ? html`
-          <div class="TaskIcon TaskCancel" @click="${() => (this.isNewTaskVisible = false)}">
+          <div class="TaskIcon TaskCancel" @click="${() => this.hideNewTaskPanel()}">
             <span>Cancel</span>
           </div>
           <div class="TaskIcon TaskAdd" @click="${() => this.addTask()}">
@@ -276,6 +251,7 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
    *
    * @protected
    * @abstract
+   * @param {ITask[]} tasks
    * @returns {TemplateResult}
    * @memberof MgtTasksBase
    */
@@ -289,18 +265,18 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
    * @memberof MgtTasksBase
    */
   protected async addTask() {
-    if (this.isNewTaskBeingAdded || !this.newTaskName) {
+    if (this._isNewTaskBeingAdded || !this.newTaskName) {
       return;
     }
 
-    this.isNewTaskBeingAdded = true;
+    this._isNewTaskBeingAdded = true;
     await this.requestUpdate();
 
     try {
       await this.createNewTask();
     } finally {
-      this.isNewTaskBeingAdded = false;
-      this.isNewTaskVisible = false;
+      this._isNewTaskBeingAdded = false;
+      this._isNewTaskVisible = false;
       this.requestUpdate();
     }
   }
@@ -333,6 +309,18 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
   protected clearState(): void {
     this.clearNewTaskData();
     this._isNewTaskVisible = false;
+    this.requestUpdate();
+  }
+
+  private showNewTaskPanel(): void {
+    this._isNewTaskVisible = true;
+    this.requestUpdate();
+  }
+
+  private hideNewTaskPanel(): void {
+    this._isNewTaskVisible = false;
+    this.clearNewTaskData();
+    this.requestUpdate();
   }
 
   private onResize() {
