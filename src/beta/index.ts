@@ -5,5 +5,6 @@
  * -------------------------------------------------------------------------------------------
  */
 
+export { MgtPlanner } from './components/mgt-planner/mgt-planner';
 export { MgtTodo } from './components/mgt-todo/mgt-todo';
 export { BetaGraph } from './BetaGraph';

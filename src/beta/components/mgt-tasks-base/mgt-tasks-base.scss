@@ -130,6 +130,10 @@ $task-icon-color-completed: var(--task-icon-color-completed, white);
         margin-right: 8px;
       }
 
+      &.hidden {
+        visibility: hidden;
+      }
+
       &:hover {
         background: var(--tasks-new-button-hover-background, $ms-color-communicationShade10);
       }

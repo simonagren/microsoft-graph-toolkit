@@ -116,19 +116,19 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
   protected renderHeader() {
     const headerContentTemplate = this.renderHeaderContent();
 
-    const addButton =
-      !this.readOnly && !this._isNewTaskVisible
-        ? html`
-            <button class="AddBarItem NewTaskButton" @click="${() => this.showNewTaskPanel()}">
-              <span class="TaskIcon">\uE710</span>
-              <span>Add</span>
-            </button>
-          `
-        : null;
+    const addClasses = classMap({
+      AddBarItem: true,
+      NewTaskButton: true,
+      hidden: this.readOnly || this._isNewTaskVisible
+    });
 
     return html`
       <div class="header">
-        ${headerContentTemplate} ${addButton}
+        ${headerContentTemplate}
+        <button class="${addClasses}" @click="${() => this.showNewTaskPanel()}">
+          <span class="TaskIcon">\uE710</span>
+          <span>Add</span>
+        </button>
       </div>
     `;
   }

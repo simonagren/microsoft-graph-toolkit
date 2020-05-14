@@ -16,6 +16,7 @@ import { Providers } from '../../../Providers';
 import { ProviderState } from '../../../providers/IProvider';
 import { getShortDateString } from '../../../utils/Utils';
 import { BetaGraph } from '../../BetaGraph';
+import { MgtTasksBase } from '../mgt-tasks-base/mgt-tasks-base';
 import {
   createTodoTask,
   deleteTodoTask,
@@ -27,7 +28,6 @@ import {
   TodoTaskList,
   updateTodoTask
 } from './graph.todo';
-import { MgtTasksBase } from './mgt-tasks-base';
 import { styles } from './mgt-todo-css';
 
 /**
