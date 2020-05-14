@@ -5,14 +5,12 @@
  * -------------------------------------------------------------------------------------------
  */
 
-import { customElement, html, property } from 'lit-element';
+import { customElement, html, property, TemplateResult } from 'lit-element';
 import { classMap } from 'lit-html/directives/class-map';
 import { repeat } from 'lit-html/directives/repeat';
-import { ComponentMediaQuery } from '../../../components/baseComponent';
 import '../../../components/mgt-person/mgt-person';
 import '../../../components/sub-components/mgt-arrow-options/mgt-arrow-options';
 import '../../../components/sub-components/mgt-dot-options/mgt-dot-options';
-import { MgtTemplatedComponent } from '../../../components/templatedComponent';
 import { IGraph } from '../../../IGraph';
 import { Providers } from '../../../Providers';
 import { ProviderState } from '../../../providers/IProvider';
@@ -29,6 +27,7 @@ import {
   TodoTaskList,
   updateTodoTask
 } from './graph.todo';
+import { MgtTasksBase } from './mgt-tasks-base';
 import { styles } from './mgt-todo-css';
 
 /**
@@ -94,7 +93,7 @@ import { styles } from './mgt-todo-css';
  * @extends {MgtBaseComponent}
  */
 @customElement('mgt-todo')
-export class MgtTodo extends MgtTemplatedComponent {
+export class MgtTodo extends MgtTasksBase {
   /**
    * Array of styles to apply to the element. The styles should be defined
    * using the `css` tag function.
@@ -102,33 +101,6 @@ export class MgtTodo extends MgtTemplatedComponent {
   public static get styles() {
     return styles;
   }
-
-  /**
-   * Get whether new task view is visible
-   *
-   * @memberof MgtTasks
-   */
-  public get isNewTaskVisible() {
-    return this._isNewTaskVisible;
-  }
-
-  /**
-   * Set whether new task is visible
-   *
-   * @memberof MgtTasks
-   */
-  public set isNewTaskVisible(value: boolean) {
-    if (value !== this._isNewTaskVisible) {
-      value ? this.showNewTaskPanel() : this.hideNewTaskPanel();
-    }
-  }
-
-  /**
-   * determines if tasks are un-editable
-   * @type {boolean}
-   */
-  @property({ attribute: 'read-only', type: Boolean })
-  public readOnly: boolean;
 
   /**
    * if set, the component will only show tasks from the target list
@@ -141,88 +113,38 @@ export class MgtTodo extends MgtTemplatedComponent {
    * if set, the component will first show tasks from this list
    *
    * @type {string}
-   * @memberof MgtTasks
+   * @memberof MgtTodo
    */
   @property({ attribute: 'initial-id', type: String })
   public initialId: string;
 
   /**
-   * sets whether the header is rendered
-   *
-   * @type {boolean}
-   * @memberof MgtTasks
-   */
-  @property({ attribute: 'hide-header', type: Boolean })
-  public hideHeader: boolean;
-
-  /**
-   * sets whether the options are rendered
-   *
-   * @type {boolean}
-   * @memberof MgtTasks
-   */
-  @property({ attribute: 'hide-options', type: Boolean })
-  public hideOptions: boolean;
-
-  /**
    * Optional filter function when rendering tasks
    *
-   * @memberof MgtTasks
+   * @memberof MgtTodo
    */
   public taskFilter: (task: TodoTask) => boolean;
 
-  @property() private _isNewTaskVisible: boolean;
-  @property() private _newTaskBeingAdded: boolean;
-  @property() private _lists: TodoTaskList[];
-  @property() private _tasks: TodoTask[];
-  @property() private _hiddenTasks: string[];
-  @property() private _loadingTasks: string[];
-  @property() private _hasDoneInitialLoad: boolean;
-  @property() private _currentList: TodoTaskList;
-  @property() private _isLoadingTasks: boolean;
-  @property() private _newTaskName: string;
+  private _lists: TodoTaskList[];
+  private _tasks: TodoTask[];
+  private _currentList: TodoTaskList;
 
+  private _isLoadingTasks: boolean;
+  private _loadingTasks: string[];
   private _newTaskDueDate: Date;
   private _newTaskListId: string;
   private _graph: IGraph;
-  private previousMediaQuery: ComponentMediaQuery;
 
   constructor() {
     super();
     this._graph = null;
-    this._newTaskName = '';
     this._newTaskDueDate = null;
     this._newTaskListId = '';
     this._currentList = null;
     this._lists = [];
     this._tasks = [];
-    this._hiddenTasks = [];
     this._loadingTasks = [];
     this._isLoadingTasks = false;
-    this._hasDoneInitialLoad = false;
-
-    this.previousMediaQuery = this.mediaQuery;
-    this.onResize = this.onResize.bind(this);
-  }
-
-  /**
-   * updates provider state
-   *
-   * @memberof MgtTasks
-   */
-  public connectedCallback() {
-    super.connectedCallback();
-    window.addEventListener('resize', this.onResize);
-  }
-
-  /**
-   * removes updates on provider state
-   *
-   * @memberof MgtTasks
-   */
-  public disconnectedCallback() {
-    window.removeEventListener('resize', this.onResize);
-    super.disconnectedCallback();
   }
 
   /**
@@ -235,82 +157,42 @@ export class MgtTodo extends MgtTemplatedComponent {
    */
   public attributeChangedCallback(name: string, oldVal: string, newVal: string) {
     super.attributeChangedCallback(name, oldVal, newVal);
-    // TODO: Handle change in critical attributes
-    if (name === 'data-source') {
-      /*this._currentList = this.initialId;
-
-      this._newTaskListId = '';
-      this._newTaskDueDate = null;
-      this._newTaskName = '';
-      this._newTaskBeingAdded = false;
-
-      this._tasks = [];
-      this._lists = [];
-
-      this._hasDoneInitialLoad = false;
-      this._todoDefaultSet = false;
-
-      this.requestStateUpdate();*/
+    switch (name) {
+      case 'target-id':
+      case 'initial-id':
+        this.clearState();
+        this.requestStateUpdate();
+        break;
     }
   }
 
   /**
-   * Invoked on each update to perform rendering tasks. This method must return
-   * a lit-html TemplateResult. Setting properties inside this method will *not*
-   * trigger the element to update.
+   * foo
    */
-  protected render() {
-    let tasks = [];
-    if (this._tasks) {
-      tasks = this._tasks.filter(task => !this._hiddenTasks.includes(task.id));
-      if (this.taskFilter) {
-        tasks = tasks.filter(task => this.taskFilter(task));
-      }
+  protected renderTasks(): TemplateResult {
+    if (this._isLoadingTasks) {
+      return this.renderLoadingTask();
     }
 
-    const headerTemplate =
-      !this.hideHeader && this._lists && this._lists.length
-        ? html`
-            <div class="Header">
-              ${this.renderHeader()}
-            </div>
-          `
-        : null;
+    let tasks = this._tasks;
+    if (tasks && this.taskFilter) {
+      tasks = tasks.filter(task => this.taskFilter(task));
+    }
 
-    const newTaskTemplate = this._isNewTaskVisible ? this.renderNewTaskPanel() : null;
-    const loadingTemplate = this.isLoadingState || this._isLoadingTasks ? this.renderLoadingTask() : null;
     const taskTemplates = repeat(tasks, task => task.id, task => this.renderTask(task));
-
     return html`
-      ${headerTemplate}
-      <div class="Tasks">
-        ${newTaskTemplate} ${loadingTemplate} ${taskTemplates}
-      </div>
+      ${taskTemplates}
     `;
   }
 
   /**
-   * Render the new task input panel.
+   * foo
    *
    * @protected
-   * @returns
+   * @returns {TemplateResult}
    * @memberof MgtTodo
    */
-  protected renderNewTaskPanel() {
-    const taskTitle = html`
-      <input
-        type="text"
-        placeholder="Task..."
-        .value="${this._newTaskName}"
-        label="new-taskName-input"
-        aria-label="new-taskName-input"
-        role="input"
-        @input="${(e: Event) => {
-          this._newTaskName = (e.target as HTMLInputElement).value;
-        }}"
-      />
-    `;
-
+  protected renderNewTaskDetails(): TemplateResult {
     const lists = this._lists.filter(
       list =>
         (this._currentList && list.id === this._currentList.id) ||
@@ -344,7 +226,6 @@ export class MgtTodo extends MgtTemplatedComponent {
           </span>
         `;
 
-    // const taskDue = null;
     const taskDue = html`
       <span class="NewTaskDue">
         <input
@@ -365,35 +246,8 @@ export class MgtTodo extends MgtTemplatedComponent {
       </span>
     `;
 
-    const taskAdd = this._newTaskBeingAdded
-      ? html`
-          <div class="TaskAddButtonContainer"></div>
-        `
-      : html`
-          <div class="TaskAddButtonContainer ${this._newTaskName === '' ? 'Disabled' : ''}">
-            <div class="TaskIcon TaskCancel" @click="${() => this.hideNewTaskPanel()}">
-              <span>Cancel</span>
-            </div>
-            <div class="TaskIcon TaskAdd" @click="${() => this.addTask()}">
-              <span>\uE710</span>
-            </div>
-          </div>
-        `;
-
     return html`
-      <div class="Task NewTask Incomplete">
-        <div class="TaskContent">
-          <div class="TaskDetailsContainer">
-            <div class="TaskTitle">
-              ${taskTitle}
-            </div>
-            <div class="TaskDetails">
-              ${taskList} ${taskDue}
-            </div>
-          </div>
-        </div>
-        ${taskAdd}
-      </div>
+      ${taskList} ${taskDue}
     `;
   }
 
@@ -404,80 +258,42 @@ export class MgtTodo extends MgtTemplatedComponent {
    * @returns
    * @memberof MgtTodo
    */
-  protected renderHeader() {
-    if (this.isLoadingState || !this._hasDoneInitialLoad) {
+  protected renderHeaderContent(): TemplateResult {
+    if (this.isLoadingState) {
       return html`
-        <span class="LoadingHeader"></span>
+        <div class="header__loading"></div>
       `;
     }
 
-    const addButton =
-      !this.readOnly && !this._isNewTaskVisible
-        ? html`
-            <button class="AddBarItem NewTaskButton" @click="${() => this.showNewTaskPanel()}">
-              <span class="TaskIcon">\uE710</span>
-              <span>Add</span>
-            </button>
-          `
-        : null;
+    const lists = this._lists || [];
+    const currentList = this._currentList;
+    const targetId = this.targetId;
+    let listSelect: TemplateResult;
 
-    const list = this._lists.find(l => l.id === this.targetId);
+    if (targetId && lists.length) {
+      const list = lists.find(l => l.id === targetId);
+      if (list) {
+        listSelect = html`
+          <span class="PlanTitle">
+            ${list.displayName}
+          </span>
+        `;
+      }
+    } else if (currentList) {
+      const listOptions = {};
+      for (const l of lists) {
+        listOptions[l.displayName] = () => this.loadTaskList(l);
+      }
 
-    const listOptions = {};
-    for (const l of this._lists) {
-      listOptions[l.displayName] = () => this.loadTaskList(l);
+      listSelect = html`
+        <mgt-arrow-options .value="${currentList.displayName}" .options="${listOptions}"></mgt-arrow-options>
+      `;
     }
-
-    const listSelect =
-      this.targetId && list
-        ? html`
-            <span class="PlanTitle">
-              ${list.displayName}
-            </span>
-          `
-        : this._currentList
-        ? html`
-            <mgt-arrow-options .value="${this._currentList.displayName}" .options="${listOptions}"></mgt-arrow-options>
-          `
-        : null;
 
     return html`
       <span class="TitleCont">
         ${listSelect}
       </span>
-      ${addButton}
-    `;
-  }
-
-  /**
-   * Render a task in a loading state.
-   *
-   * @protected
-   * @returns
-   * @memberof MgtTodo
-   */
-  protected renderLoadingTask() {
-    return html`
-      <div class="Task LoadingTask">
-        <div class="TaskContent">
-          <div class="TaskCheckContainer">
-            <div class="TaskCheck"></div>
-          </div>
-          <div class="TaskDetailsContainer">
-            <div class="TaskTitle"></div>
-            <div class="TaskDetails">
-              <span class="TaskDetail">
-                <div class="TaskDetailIcon"></div>
-                <div class="TaskDetailName"></div>
-              </span>
-              <span class="TaskDetail">
-                <div class="TaskDetailIcon"></div>
-                <div class="TaskDetailName"></div>
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
     `;
   }
 
@@ -565,7 +381,7 @@ export class MgtTodo extends MgtTemplatedComponent {
             <div class="TaskOptions">
               <mgt-dot-options
                 .options="${{
-                  'Delete Task': () => this.removeTask(task.id)
+                  'Delete Task': e => this.removeTask(e, task.id)
                 }}"
               ></mgt-dot-options>
             </div>
@@ -614,12 +430,14 @@ export class MgtTodo extends MgtTemplatedComponent {
       return;
     }
 
-    const graph = provider.graph.forComponent(this);
-    const betaGraph = BetaGraph.fromGraph(graph);
-    this._graph = betaGraph;
+    if (!this._graph) {
+      const graph = provider.graph.forComponent(this);
+      const betaGraph = BetaGraph.fromGraph(graph);
+      this._graph = betaGraph;
+    }
 
-    if (!this._lists || !this._lists.length) {
-      let lists;
+    let lists = this._lists;
+    if (!lists || !lists.length) {
       if (this.targetId) {
         const targetList = await getTodoTaskList(this._graph, this.targetId);
         lists = targetList ? [targetList] : [];
@@ -627,40 +445,98 @@ export class MgtTodo extends MgtTemplatedComponent {
         lists = await getTodoTaskLists(this._graph);
       }
 
-      let currentList = null;
-      if (lists && lists.length) {
-        if (this.initialId) {
-          currentList = lists.find(l => l.id === this.initialId);
-        }
-        if (!currentList) {
-          currentList = lists[0];
-        }
-
-        this._lists = lists;
-        await this.loadTaskList(currentList);
-      }
+      this._tasks = [];
+      this._currentList = null;
+      this._lists = lists;
     }
 
-    this._hasDoneInitialLoad = true;
+    let currentList = this._currentList;
+    if (!currentList && lists && lists.length) {
+      if (this.initialId) {
+        currentList = lists.find(l => l.id === this.initialId);
+      }
+      if (!currentList) {
+        currentList = lists[0];
+      }
+
+      this._tasks = [];
+      this._currentList = currentList;
+    }
+
+    if (currentList) {
+      this.loadTaskList(currentList);
+    }
   }
 
-  private async loadTaskList(list: TodoTaskList): Promise<void> {
-    this._isLoadingTasks = true;
-    this._tasks = null;
-    this._currentList = list;
-    this._tasks = await getTodoTasks(this._graph, list.id);
+  /**
+   * foo
+   *
+   * @protected
+   * @returns {Promise<any>}
+   * @memberof MgtTodo
+   */
+  protected async createNewTask(): Promise<void> {
+    const listId = this._currentList.id;
+    const taskData = {
+      title: this.newTaskName
+    };
+
+    if (this._newTaskDueDate) {
+      // tslint:disable-next-line: no-string-literal
+      taskData['dueDateTime'] = {
+        dateTime: this._newTaskDueDate.toISOString(),
+        timeZone: 'UTC'
+      };
+    }
+
+    const task = await createTodoTask(this._graph, listId, taskData);
+    this._tasks.unshift(task);
+  }
+
+  /**
+   * foo
+   *
+   * @protected
+   * @memberof MgtTodo
+   */
+  protected clearNewTaskData(): void {
+    super.clearNewTaskData();
+    this._newTaskDueDate = null;
+    this._newTaskListId = null;
+  }
+
+  /**
+   * foo
+   *
+   * @protected
+   * @memberof MgtTodo
+   */
+  protected clearState(): void {
+    super.clearState();
+    this._currentList = null;
+    this._lists = [];
+    this._tasks = [];
+    this._loadingTasks = [];
     this._isLoadingTasks = false;
   }
 
-  private onResize() {
-    if (this.mediaQuery !== this.previousMediaQuery) {
-      this.previousMediaQuery = this.mediaQuery;
-      this.requestUpdate();
+  private async loadTaskList(list: TodoTaskList): Promise<void> {
+    if (!list) {
+      return;
     }
+    this._isLoadingTasks = true;
+    this._currentList = list;
+    this.requestUpdate();
+
+    this._tasks = await getTodoTasks(this._graph, list.id);
+
+    this._isLoadingTasks = false;
+    this.requestUpdate();
   }
 
   private async updateTaskStatus(task: TodoTask, taskStatus: TaskStatus): Promise<void> {
     this._loadingTasks = [...this._loadingTasks, task.id];
+    this.requestUpdate();
 
     // Change the task status
     task.status = taskStatus;
@@ -673,44 +549,18 @@ export class MgtTodo extends MgtTemplatedComponent {
     this._tasks[taskIndex] = task;
 
     this._loadingTasks = this._loadingTasks.filter(id => id !== task.id);
-    this.requestStateUpdate();
+    this.requestUpdate();
   }
 
-  private async removeTask(taskId: string) {
-    this._hiddenTasks = [...this._hiddenTasks, taskId];
+  // tslint:disable-next-line: completed-docs
+  private async removeTask(e: { target: HTMLElement }, taskId: string) {
+    this._tasks = this._tasks.filter(t => t.id !== taskId);
+    this.requestUpdate();
 
     const listId = this._currentList.id;
     await deleteTodoTask(this._graph, listId, taskId);
 
     this._tasks = this._tasks.filter(t => t.id !== taskId);
-    this._hiddenTasks = this._hiddenTasks.filter(id => id !== taskId);
-    this.requestStateUpdate();
-  }
-
-  private async addTask() {
-    if (this._newTaskBeingAdded || !this._newTaskName) {
-      return;
-    }
-
-    try {
-      this._newTaskBeingAdded = true;
-
-      const listId = this._currentList.id;
-      const taskData = {
-        dueDateTime: {
-          dateTime: this._newTaskDueDate.toISOString(),
-          timeZone: 'UTC'
-        },
-        title: this._newTaskName
-      };
-
-      const task = await createTodoTask(this._graph, listId, taskData);
-      this._tasks.unshift(task);
-    } finally {
-      this._newTaskBeingAdded = false;
-      this.hideNewTaskPanel();
-      await this.requestStateUpdate();
-    }
   }
 
   private handleTaskClick(e: Event, task: TodoTask) {
@@ -730,16 +580,6 @@ export class MgtTodo extends MgtTemplatedComponent {
       e.stopPropagation();
       e.preventDefault();
     }
-  }
-
-  private showNewTaskPanel(): void {
-    this._isNewTaskVisible = true;
-  }
-
-  private hideNewTaskPanel(): void {
-    this._isNewTaskVisible = false;
-    this._newTaskDueDate = null;
-    this._newTaskName = '';
   }
 
   private dateToInputValue(date: Date) {

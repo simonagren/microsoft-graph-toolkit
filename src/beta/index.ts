@@ -6,3 +6,4 @@
  */
 
 export { MgtTodo } from './components/mgt-todo/mgt-todo';
+export { BetaGraph } from './BetaGraph';

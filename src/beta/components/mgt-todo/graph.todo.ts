@@ -151,7 +151,7 @@ export async function createTodoTask(
   graph: IGraph,
   listId: string,
   // tslint:disable-next-line: completed-docs
-  taskData: { title: string; dueDateTime: { dateTime: string; timeZone: string } }
+  taskData: { title: string; dueDateTime?: { dateTime: string; timeZone: string } }
 ): Promise<TodoTask> {
   const task: TodoTask = await graph
     .api(`/me/todo/lists/${listId}/tasks`)
