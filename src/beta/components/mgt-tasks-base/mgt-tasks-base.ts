@@ -44,6 +44,22 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
   public hideOptions: boolean;
 
   /**
+   * if set, the component will only show tasks from the target list
+   * @type {string}
+   */
+  @property({ attribute: 'target-id', type: String })
+  public targetId: string;
+
+  /**
+   * if set, the component will first show tasks from this list
+   *
+   * @type {string}
+   * @memberof MgtTodo
+   */
+  @property({ attribute: 'initial-id', type: String })
+  public initialId: string;
+
+  /**
    * foo
    *
    * @readonly
@@ -66,6 +82,25 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
     this.clearState();
     this._previousMediaQuery = this.mediaQuery;
     this.onResize = this.onResize.bind(this);
+  }
+
+  /**
+   * Synchronizes property values when attributes change.
+   *
+   * @param {*} name
+   * @param {*} oldValue
+   * @param {*} newValue
+   * @memberof MgtTasks
+   */
+  public attributeChangedCallback(name: string, oldVal: string, newVal: string) {
+    super.attributeChangedCallback(name, oldVal, newVal);
+    switch (name) {
+      case 'target-id':
+      case 'initial-id':
+        this.clearState();
+        this.requestStateUpdate();
+        break;
+    }
   }
 
   /**
@@ -258,6 +293,26 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
   protected abstract renderTasks(): TemplateResult;
 
   /**
+   * Render a bucket icon.
+   *
+   * @protected
+   * @returns
+   * @memberof MgtTodo
+   */
+  protected renderBucketIcon() {
+    return html`
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          fill-rule="evenodd"
+          clip-rule="evenodd"
+          d="M14 2H2V4H3H5H6H10H11H13H14V2ZM10 5H6V6H10V5ZM5 5H3V14H13V5H11V6C11 6.55228 10.5523 7 10 7H6C5.44772 7 5 6.55228 5 6V5ZM1 5H2V14V15H3H13H14V14V5H15V4V2V1H14H2H1V2V4V5Z"
+          fill="#3C3C3C"
+        />
+      </svg>
+    `;
+  }
+
+  /**
    * foo
    *
    * @protected
@@ -310,6 +365,36 @@ export abstract class MgtTasksBase extends MgtTemplatedComponent {
     this.clearNewTaskData();
     this._isNewTaskVisible = false;
     this.requestUpdate();
+  }
+
+  /**
+   * foo
+   *
+   * @protected
+   * @param {Event} e
+   * @param {TodoTask} task
+   * @memberof MgtTasksBase
+   */
+  protected handleTaskClick(e: Event, task: any) {
+    this.fireCustomEvent('taskClick', { task });
+    e.stopPropagation();
+    e.preventDefault();
+  }
+
+  /**
+   * foo
+   *
+   * @protected
+   * @param {Date} date
+   * @returns
+   * @memberof MgtTasksBase
+   */
+  protected dateToInputValue(date: Date) {
+    if (date) {
+      return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+    }
+
+    return null;
   }
 
   private showNewTaskPanel(): void {

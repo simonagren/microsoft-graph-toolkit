@@ -5,7 +5,7 @@
  * -------------------------------------------------------------------------------------------
  */
 
-import { customElement, html, property, TemplateResult } from 'lit-element';
+import { customElement, html, TemplateResult } from 'lit-element';
 import { classMap } from 'lit-html/directives/class-map';
 import { repeat } from 'lit-html/directives/repeat';
 import '../../../components/mgt-person/mgt-person';
@@ -103,22 +103,6 @@ export class MgtTodo extends MgtTasksBase {
   }
 
   /**
-   * if set, the component will only show tasks from the target list
-   * @type {string}
-   */
-  @property({ attribute: 'target-id', type: String })
-  public targetId: string;
-
-  /**
-   * if set, the component will first show tasks from this list
-   *
-   * @type {string}
-   * @memberof MgtTodo
-   */
-  @property({ attribute: 'initial-id', type: String })
-  public initialId: string;
-
-  /**
    * Optional filter function when rendering tasks
    *
    * @memberof MgtTodo
@@ -145,25 +129,6 @@ export class MgtTodo extends MgtTasksBase {
     this._tasks = [];
     this._loadingTasks = [];
     this._isLoadingTasks = false;
-  }
-
-  /**
-   * Synchronizes property values when attributes change.
-   *
-   * @param {*} name
-   * @param {*} oldValue
-   * @param {*} newValue
-   * @memberof MgtTasks
-   */
-  public attributeChangedCallback(name: string, oldVal: string, newVal: string) {
-    super.attributeChangedCallback(name, oldVal, newVal);
-    switch (name) {
-      case 'target-id':
-      case 'initial-id':
-        this.clearState();
-        this.requestStateUpdate();
-        break;
-    }
   }
 
   /**
@@ -198,18 +163,20 @@ export class MgtTodo extends MgtTasksBase {
         (this._currentList && list.id === this._currentList.id) ||
         (!this._currentList && list.id === this._newTaskListId)
     );
+
     if (lists.length > 0 && !this._newTaskListId) {
       this._newTaskListId = lists[0].id;
     }
+
     const taskList = this._currentList
       ? html`
-          <span class="NewTaskBucket">
+          <span class="NewTaskGroup">
             ${this.renderBucketIcon()}
             <span>${this._currentList.displayName}</span>
           </span>
         `
       : html`
-          <span class="NewTaskBucket">
+          <span class="NewTaskGroup">
             ${this.renderBucketIcon()}
             <select
               .value="${this._newTaskListId}"
@@ -294,26 +261,6 @@ export class MgtTodo extends MgtTasksBase {
       <span class="TitleCont">
         ${listSelect}
       </span>
-    `;
-  }
-
-  /**
-   * Render a bucket icon.
-   *
-   * @protected
-   * @returns
-   * @memberof MgtTodo
-   */
-  protected renderBucketIcon() {
-    return html`
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path
-          fill-rule="evenodd"
-          clip-rule="evenodd"
-          d="M14 2H2V4H3H5H6H10H11H13H14V2ZM10 5H6V6H10V5ZM5 5H3V14H13V5H11V6C11 6.55228 10.5523 7 10 7H6C5.44772 7 5 6.55228 5 6V5ZM1 5H2V14V15H3H13H14V14V5H15V4V2V1H14H2H1V2V4V5Z"
-          fill="#3C3C3C"
-        />
-      </svg>
     `;
   }
 
@@ -464,7 +411,7 @@ export class MgtTodo extends MgtTasksBase {
     }
 
     if (currentList) {
-      this.loadTaskList(currentList);
+      await this.loadTaskList(currentList);
     }
   }
 
@@ -521,9 +468,6 @@ export class MgtTodo extends MgtTasksBase {
   }
 
   private async loadTaskList(list: TodoTaskList): Promise<void> {
-    if (!list) {
-      return;
-    }
     this._isLoadingTasks = true;
     this._currentList = list;
     this.requestUpdate();
@@ -563,12 +507,6 @@ export class MgtTodo extends MgtTasksBase {
     this._tasks = this._tasks.filter(t => t.id !== taskId);
   }
 
-  private handleTaskClick(e: Event, task: TodoTask) {
-    this.fireCustomEvent('taskClick', { task });
-    e.stopPropagation();
-    e.preventDefault();
-  }
-
   private handleTaskCheckClick(e: Event, task: TodoTask) {
     if (!this.readOnly) {
       if ((TaskStatus as any)[task.status] === TaskStatus.completed) {
@@ -580,13 +518,5 @@ export class MgtTodo extends MgtTasksBase {
       e.stopPropagation();
       e.preventDefault();
     }
-  }
-
-  private dateToInputValue(date: Date) {
-    if (date) {
-      return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-    }
-
-    return null;
   }
 }
