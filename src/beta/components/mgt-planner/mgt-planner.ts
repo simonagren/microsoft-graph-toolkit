@@ -500,7 +500,7 @@ export class MgtPlanner extends MgtTasksBase {
             <div class="TaskOptions">
               <mgt-dot-options
                 .options="${{
-                  'Delete Task': e => this.removeTask(e, task.id)
+                  'Delete Task': e => this.removeTask(e, task)
                 }}"
               ></mgt-dot-options>
             </div>
@@ -695,8 +695,12 @@ export class MgtPlanner extends MgtTasksBase {
     // Change the task status
     const percentComplete = completed ? 100 : 0;
 
-    // Send update request
-    task = await updatePlannerTask(this._graph, task.id, { percentComplete });
+    try {
+      // Send update request
+      await updatePlannerTask(this._graph, task.id, task['@odata.etag'], { percentComplete });
+    } catch {
+      // no-op
+    }
 
     const taskIndex = this._tasks.findIndex(t => t.id === task.id);
     this._tasks[taskIndex] = task;
@@ -706,11 +710,12 @@ export class MgtPlanner extends MgtTasksBase {
   }
 
   // tslint:disable-next-line: completed-docs
-  private async removeTask(e: { target: HTMLElement }, taskId: string) {
+  private async removeTask(e: { target: HTMLElement }, task: GraphTypes.PlannerTask) {
+    const taskId = task.id;
     this._tasks = this._tasks.filter(t => t.id !== taskId);
     this.requestUpdate();
 
-    await deletePlannerTask(this._graph, taskId);
+    await deletePlannerTask(this._graph, taskId, task['@odata.etag']);
 
     this._tasks = this._tasks.filter(t => t.id !== taskId);
   }
@@ -774,7 +779,7 @@ export class MgtPlanner extends MgtTasksBase {
 
     if (task) {
       this._loadingTasks = [...this._loadingTasks, task.id];
-      await assignPeopleToTask(this._graph, task.id, peopleObj);
+      await assignPeopleToTask(this._graph, task.id, task['@odata.etag'], peopleObj);
       await this.requestStateUpdate();
       this._loadingTasks = this._loadingTasks.filter(id => id !== task.id);
     }

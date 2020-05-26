@@ -29,10 +29,11 @@ export enum TaskStatus {
  * @param {string} taskId
  * @returns {Promise<void>}
  */
-export async function deletePlannerTask(graph: IGraph, taskId: string): Promise<void> {
+export async function deletePlannerTask(graph: IGraph, taskId: string, eTag: string): Promise<void> {
   return graph
     .api(`/planner/tasks/${taskId}`)
     .header('Cache-Control', 'no-store')
+    .header('If-Match', eTag)
     .middlewareOptions(prepScopes('Group.ReadWrite.All'))
     .delete();
 }
@@ -62,8 +63,8 @@ export async function createPlannerTask(
  * @param {string} taskId
  * @param {*} peopleObj
  */
-export async function assignPeopleToTask(graph: IGraph, taskId: string, people: any) {
-  await updatePlannerTask(graph, taskId, { assignments: people });
+export async function assignPeopleToTask(graph: IGraph, taskId: string, eTag: string, people: any) {
+  await updatePlannerTask(graph, taskId, eTag, { assignments: people });
 }
 
 /**
@@ -75,10 +76,16 @@ export async function assignPeopleToTask(graph: IGraph, taskId: string, people: 
  * @returns {Promise<any>}
  * @memberof Graph
  */
-export async function updatePlannerTask(graph: IGraph, taskId: string, details: GraphTypes.PlannerTask): Promise<any> {
-  return await graph
+export async function updatePlannerTask(
+  graph: IGraph,
+  taskId: string,
+  eTag: string,
+  details: GraphTypes.PlannerTask
+): Promise<void> {
+  graph
     .api(`/planner/tasks/${taskId}`)
     .header('Cache-Control', 'no-store')
+    .header('If-Match', eTag)
     .middlewareOptions(prepScopes('Group.ReadWrite.All'))
     .patch(JSON.stringify(details));
 }
